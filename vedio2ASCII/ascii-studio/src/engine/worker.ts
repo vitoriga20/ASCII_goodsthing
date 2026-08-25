@@ -195,6 +195,8 @@ import {
 	type MoveClipTarget,
 	type TransformParams
 } from './timeline';
+import { DEFAULT_CLIP_EFFECTS } from './effects';
+import { RollingFrameRate } from './rolling-frame-rate';
 import { applyProgramLayoutToResolvedLayers } from './program-layout-resolve';
 import { normalizeTransform } from './transform';
 import type { SourceVideoTrackInspection } from './media-adapters/types';
@@ -1295,6 +1297,57 @@ function applyCaptureLanding(
 	return trackIds;
 }
 
+let livePreviewSourceId: string | null = null;
+let livePreviewDropped = 0;
+const liveRenderRate = new RollingFrameRate();
+
+async function handleLivePreviewFrame(
+	cmd: Extract<WorkerCommand, { type: 'live-preview-frame' }>
+): Promise<void> {
+	const input = cmd.frame;
+	let frame: VideoFrame | null = null;
+	try {
+		frame =
+			input instanceof VideoFrame
+				? input
+				: new VideoFrame(input, { timestamp: Math.round(cmd.mediaTimeS * 1e6) });
+		if (!renderer || livePreviewSourceId !== cmd.sourceId) {
+			livePreviewDropped += 1;
+			return;
+		}
+		renderer.present(
+			[{ kind: 'frame', frame, effects: DEFAULT_CLIP_EFFECTS, transform: defaultClipTransform() }],
+			cmd.mediaTimeS
+		);
+		await renderer.gpuDevice.queue.onSubmittedWorkDone();
+		liveRenderRate.record(performance.now());
+		post({
+			type: 'live-preview-state',
+			mode: 'running',
+			sourceFps: 0,
+			renderFps: liveRenderRate.value(performance.now()),
+			droppedFrames: livePreviewDropped,
+			inFlight: 1,
+			lastMediaTimeS: cmd.mediaTimeS,
+			lastError: null
+		});
+	} catch (error) {
+		post({
+			type: 'live-preview-state',
+			mode: 'error',
+			sourceFps: 0,
+			renderFps: 0,
+			droppedFrames: livePreviewDropped,
+			inFlight: 0,
+			lastMediaTimeS: cmd.mediaTimeS,
+			lastError: errorMessage(error)
+		});
+	} finally {
+		if (frame && frame !== input) frame.close();
+		input.close();
+		post({ type: 'live-preview-frame-ack', sourceId: cmd.sourceId, sequence: cmd.sequence });
+	}
+}
 function post(msg: WorkerStateMessage) {
 	self.postMessage(msg);
 }
@@ -9038,6 +9091,36 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 			break;
 		case 'pause':
 			handlePause();
+			break;
+		case 'live-preview-start':
+			livePreviewSourceId = cmd.sourceId;
+			livePreviewDropped = 0;
+			post({
+				type: 'live-preview-state',
+				mode: 'starting',
+				sourceFps: 0,
+				renderFps: 0,
+				droppedFrames: 0,
+				inFlight: 0,
+				lastMediaTimeS: null,
+				lastError: null
+			});
+			break;
+		case 'live-preview-stop':
+			if (livePreviewSourceId === cmd.sourceId) livePreviewSourceId = null;
+			post({
+				type: 'live-preview-state',
+				mode: 'idle',
+				sourceFps: 0,
+				renderFps: 0,
+				droppedFrames: livePreviewDropped,
+				inFlight: 0,
+				lastMediaTimeS: null,
+				lastError: null
+			});
+			break;
+		case 'live-preview-frame':
+			void handleLivePreviewFrame(cmd);
 			break;
 		case 'seek':
 			handleSeek(cmd.time);

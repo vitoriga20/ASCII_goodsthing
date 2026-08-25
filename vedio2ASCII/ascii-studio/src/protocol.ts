@@ -2406,9 +2406,148 @@ export interface SetAsciiEffectCommand {
 	params: Partial<AsciiEffectParams>;
 }
 
+// ── Real-time ASCII preview ────────────────────────────────────────────────
+// Ownership: transferred frames belong to the worker; it closes them after render,
+// drop, error, or stop. Pending frames remain main-thread-owned. ACKs never return
+// ownership; they only release the sender-side backpressure slot.
+export type LivePreviewFrame = VideoFrame | ImageBitmap;
+export type LivePreviewMode = 'idle' | 'starting' | 'running' | 'ended' | 'error';
+
+export interface LivePreviewStartCommand {
+	type: 'live-preview-start';
+	sourceId: string;
+}
+
+export interface LivePreviewFrameCommand {
+	type: 'live-preview-frame';
+	sourceId: string;
+	sequence: number;
+	mediaTimeS: number;
+	frame: LivePreviewFrame;
+}
+
+export interface LivePreviewStopCommand {
+	type: 'live-preview-stop';
+	sourceId: string;
+}
+
+export interface LivePreviewFrameAck {
+	type: 'live-preview-frame-ack';
+	sourceId: string;
+	sequence: number;
+}
+
+export interface LivePreviewStatus {
+	mode: LivePreviewMode;
+	sourceFps: number;
+	renderFps: number;
+	droppedFrames: number;
+	inFlight: number;
+	lastMediaTimeS: number | null;
+	lastError: string | null;
+}
+
+export interface LivePreviewStateMessage extends LivePreviewStatus {
+	type: 'live-preview-state';
+}
+
+export interface LivePreviewBackpressureState {
+	sourceId: string;
+	stopped: boolean;
+	lastSequence: number;
+	inFlightSequence: number | null;
+	pendingSequence: number | null;
+}
+
+export function createLivePreviewBackpressureState(sourceId: string): LivePreviewBackpressureState {
+	return {
+		sourceId,
+		stopped: false,
+		lastSequence: -1,
+		inFlightSequence: null,
+		pendingSequence: null
+	};
+}
+
+export function scheduleLivePreviewFrame(
+	state: LivePreviewBackpressureState,
+	sourceId: string,
+	sequence: number
+): {
+	disposition: 'send' | 'replace-pending' | 'ignore' | 'reject';
+	state: LivePreviewBackpressureState;
+	replacedSequence?: number;
+} {
+	if (state.stopped) return { disposition: 'ignore', state };
+	if (
+		sourceId !== state.sourceId ||
+		!Number.isInteger(sequence) ||
+		sequence < 0 ||
+		sequence <= state.lastSequence
+	) {
+		return { disposition: 'reject', state };
+	}
+	if (state.inFlightSequence === null) {
+		return {
+			disposition: 'send',
+			state: { ...state, lastSequence: sequence, inFlightSequence: sequence }
+		};
+	}
+	return {
+		disposition: 'replace-pending',
+		state: { ...state, lastSequence: sequence, pendingSequence: sequence },
+		replacedSequence: state.pendingSequence ?? undefined
+	};
+}
+
+export function acknowledgeLivePreviewFrame(
+	state: LivePreviewBackpressureState,
+	sourceId: string,
+	sequence: number
+): { accepted: boolean; state: LivePreviewBackpressureState; nextSequence: number | null } {
+	if (state.stopped || sourceId !== state.sourceId || sequence !== state.inFlightSequence) {
+		return { accepted: false, state, nextSequence: null };
+	}
+	if (state.pendingSequence !== null) {
+		return {
+			accepted: true,
+			nextSequence: state.pendingSequence,
+			state: { ...state, inFlightSequence: state.pendingSequence, pendingSequence: null }
+		};
+	}
+	return { accepted: true, nextSequence: null, state: { ...state, inFlightSequence: null } };
+}
+
+export function stopLivePreview(state: LivePreviewBackpressureState): LivePreviewBackpressureState {
+	return { ...state, stopped: true, inFlightSequence: null, pendingSequence: null };
+}
+
+export function isLivePreviewFrameCommand(value: unknown): value is LivePreviewFrameCommand {
+	if (!value || typeof value !== 'object') return false;
+	const command = value as Partial<LivePreviewFrameCommand>;
+	return (
+		command.type === 'live-preview-frame' &&
+		typeof command.sourceId === 'string' &&
+		command.sourceId.length > 0 &&
+		typeof command.sequence === 'number' &&
+		Number.isInteger(command.sequence) &&
+		command.sequence >= 0 &&
+		typeof command.mediaTimeS === 'number' &&
+		Number.isFinite(command.mediaTimeS) &&
+		typeof command.frame === 'object' &&
+		command.frame !== null
+	);
+}
+
+export function getLivePreviewTransferables(command: LivePreviewFrameCommand): Transferable[] {
+	return [command.frame] as Transferable[];
+}
 export type WorkerCommand =
 	| WorkerInit
 	| WorkerInitV2
+	| LivePreviewStartCommand
+	| LivePreviewFrameCommand
+	| LivePreviewStopCommand
 	| { type: 'import'; file: File; fileHandle?: FileSystemFileHandle | null }
 	| { type: 'play' }
 	| { type: 'pause' }
@@ -2723,6 +2862,8 @@ export interface HDRWarningSnapshot {
 }
 
 export type WorkerStateMessage =
+	| LivePreviewFrameAck
+	| LivePreviewStateMessage
 	| {
 			type: 'ready';
 			webgpu: boolean;

@@ -80,6 +80,7 @@ import { createSharedClock } from './clock';
 import { createWorkerBridge } from './worker-bridge';
 import { PreviewCanvas } from './PreviewCanvas';
 import { SourceMonitor } from './SourceMonitor';
+import { LivePreviewDriver } from '../engine/live-preview';
 import { AsciiInspector } from './AsciiInspector';
 import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from '../engine/ascii-effect';
 import { setStudioLocale, studioCopy, studioLocale, type StudioLocale } from './locale';
@@ -415,6 +416,29 @@ export function App() {
 	const [exportReady, setExportReady] = createSignal(false);
 	const [asciiEffect, setAsciiEffect] = createSignal<AsciiEffectParams>(DEFAULT_ASCII_EFFECT);
 	const [sourcePreviewUrl, setSourcePreviewUrl] = createSignal<string | null>(null);
+	const [livePreviewEnabled, setLivePreviewEnabled] = createSignal(false);
+	const [livePreviewHud, setLivePreviewHud] = createSignal({
+		mode: 'idle',
+		sourceFps: 0,
+		droppedFrames: 0,
+		renderFps: 0,
+		lastMediaTimeS: null as number | null,
+		lastError: null as string | null
+	});
+	const [livePreviewWaiting, setLivePreviewWaiting] = createSignal(false);
+	// Watchdog: when the realtime channel is running but no frame has been
+	// rendered for 500ms, surface a "waiting" state instead of a frozen HUD.
+	createEffect(() => {
+		const hud = livePreviewHud();
+		if (!livePreviewEnabled() || hud.mode !== 'running') {
+			setLivePreviewWaiting(false);
+			return;
+		}
+		setLivePreviewWaiting(false);
+		const timer = setTimeout(() => setLivePreviewWaiting(true), 500);
+		onCleanup(() => clearTimeout(timer));
+	});
+	let livePreviewFile: File | null = null;
 	const studioText = () => studioCopy(studioLocale());
 	const [capabilityPanelOpen, setCapabilityPanelOpen] = createSignal(false);
 	// In-app user guide route (/docs[/section]); null means the editor view.
@@ -888,6 +912,39 @@ export function App() {
 	})();
 	let bridge: ReturnType<typeof createWorkerBridge> | null = null;
 	let worker: Worker | null = null;
+	const livePreviewDriver = new LivePreviewDriver({
+		send: (command, transfer) => bridge?.send(command, transfer),
+		onState: (state) => setLivePreviewHud((current) => ({ ...current, ...state }))
+	});
+
+	async function toggleLivePreview(): Promise<void> {
+		if (livePreviewEnabled()) {
+			livePreviewDriver.stop();
+			updateAsciiEffect({ enabled: false });
+			setLivePreviewEnabled(false);
+			return;
+		}
+		if (!livePreviewFile || !bridge) {
+			setStatusLine('Import a video before enabling real-time rendering.');
+			return;
+		}
+		try {
+			updateAsciiEffect({ enabled: true });
+			await livePreviewDriver.start(
+				'live-preview',
+				livePreviewFile,
+				clock.currentTime(),
+				clock.playing()
+			);
+			setLivePreviewEnabled(true);
+		} catch (error) {
+			setLivePreviewHud((current) => ({
+				...current,
+				mode: 'error',
+				lastError: error instanceof Error ? error.message : String(error)
+			}));
+		}
+	}
 	let initSent = false;
 	let pendingInitCanvas: OffscreenCanvas | null = null;
 	let compatibilityImportGeneration = 0;
@@ -2415,6 +2472,20 @@ export function App() {
 	}
 
 	function handleState(msg: WorkerStateMessage) {
+		if (msg.type === 'live-preview-frame-ack') livePreviewDriver.handleAck(msg);
+		// The driver owns sourceFps and droppedFrames (it counts capture-side
+		// drops); the worker owns renderFps. Spreading the whole worker message
+		// would clobber the driver's real values with the worker's zeroes.
+		if (msg.type === 'live-preview-state') {
+			setLivePreviewHud((current) => ({
+				...current,
+				mode: msg.mode,
+				renderFps: msg.renderFps,
+				inFlight: msg.inFlight,
+				lastMediaTimeS: msg.lastMediaTimeS ?? current.lastMediaTimeS,
+				lastError: msg.lastError
+			}));
+		}
 		// Publish tap messages route to the controller (it owns the track/frames).
 		if (publishController.handleWorkerMessage(msg)) return;
 		switch (msg.type) {
@@ -3418,6 +3489,7 @@ export function App() {
 	}
 
 	function importMedia(file: File, fileHandle?: FileSystemFileHandle | null) {
+		livePreviewFile = file;
 		discardRestoreBeforeImport();
 		setSourcePreview(file);
 		if (previewSurfaceAvailable()) {
@@ -3993,11 +4065,13 @@ export function App() {
 		const t = clock.currentTime();
 		if (audioSabReady()) void audioEngine.play(t);
 		bridge?.send({ type: 'play' });
+		void livePreviewDriver.setPlaying(true);
 	}
 
 	function pauseFromKeyboard() {
 		bridge?.send({ type: 'pause' });
 		audioEngine.pause();
+		void livePreviewDriver.setPlaying(false);
 	}
 
 	function zoomTimeline(direction: 1 | -1) {
@@ -4199,6 +4273,7 @@ export function App() {
 				worker.removeEventListener('error', handleWorkerCrash);
 				worker.terminate();
 			}
+			livePreviewDriver.dispose();
 			audioEngine.dispose();
 		});
 	});
@@ -4226,10 +4301,12 @@ export function App() {
 						const t = clock.currentTime();
 						if (audioSabReady()) void audioEngine.play(t);
 						bridge?.send({ type: 'play' });
+						void livePreviewDriver.setPlaying(true);
 					}}
 					onPause={() => {
 						bridge?.send({ type: 'pause' });
 						audioEngine.pause();
+						void livePreviewDriver.setPlaying(false);
 					}}
 					onStep={(direction) => bridge?.send({ type: 'step', direction })}
 					loop={loopPlayback}
@@ -4691,7 +4768,16 @@ export function App() {
 									locale={studioLocale}
 								/>
 								<section class="ascii-monitor" aria-label="ASCII program preview">
-									<div class="monitor-label"><span>{studioText().asciiProgram}</span><span>{studioText().gpu}</span></div>
+									<p class="live-preview-hud">
+										{livePreviewWaiting() ? '等待视频帧' : livePreviewHud().mode} · 源{' '}
+										{livePreviewHud().sourceFps.toFixed(0)} FPS · ASCII{' '}
+										{livePreviewHud().renderFps.toFixed(0)} FPS · 丢帧{' '}
+										{livePreviewHud().droppedFrames}
+									</p>
+									<div class="monitor-label">
+										<span>{studioText().asciiProgram}</span>
+										<span>{studioText().gpu}</span>
+									</div>
 									<Show when={previewKey() + 1} keyed>
 										{(_k) => (
 											<PreviewCanvas onOffscreenReady={sendInit} onCanvasEl={setPreviewCanvasEl} />
@@ -5050,8 +5136,14 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('inspector')}
 										>
-											<AsciiInspector value={asciiEffect} onChange={updateAsciiEffect} locale={studioLocale} />
-										<Inspector
+											<AsciiInspector
+												value={asciiEffect}
+												onChange={updateAsciiEffect}
+												livePreviewEnabled={livePreviewEnabled}
+												onToggleLivePreview={() => void toggleLivePreview()}
+												locale={studioLocale}
+											/>
+											<Inspector
 												metadata={metadata()}
 												selectedClip={selectedClip()}
 												selectedTrackMix={selectedTrackMix()}
@@ -5089,7 +5181,10 @@ export function App() {
 													})
 												}
 												playheadTime={clock.currentTime()}
-												onSeek={(time) => bridge?.send({ type: 'seek', time })}
+												onSeek={(time) => {
+													bridge?.send({ type: 'seek', time });
+													void livePreviewDriver.seek(time);
+												}}
 												onSetKeyframe={(trackId, clipId, key, t, value, easing) =>
 													bridge?.send({
 														type: 'set-keyframe',
@@ -5801,6 +5896,7 @@ export function App() {
 						onSeek={(t) => {
 							if (audioSabReady()) void audioEngine.seek(t);
 							bridge?.send({ type: 'seek', time: t });
+							void livePreviewDriver.seek(t);
 						}}
 						onSplit={(trackId, _clipId, time) => bridge?.send({ type: 'split', trackId, time })}
 						onDelete={(trackId, clipId) => bridge?.send({ type: 'delete-clip', trackId, clipId })}

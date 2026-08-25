@@ -80,6 +80,20 @@ body {
 	color: #d8b66a;
 }
 
+.live-preview-hud {
+	position: absolute;
+	right: 0.65rem;
+	bottom: 0.55rem;
+	z-index: 6;
+	margin: 0;
+	color: rgb(174 244 212 / 72%);
+	font-family: var(--font-mono);
+	font-size: 0.6rem;
+	letter-spacing: 0.08em;
+	pointer-events: none;
+	text-align: right;
+}
+
 .source-monitor-video,
 .ascii-monitor .preview-canvas {
 	display: block;

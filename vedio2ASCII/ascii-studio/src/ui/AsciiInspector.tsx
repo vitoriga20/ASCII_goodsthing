@@ -9,6 +9,8 @@ import { studioCopy, type StudioLocale } from './locale';
 interface AsciiInspectorProps {
 	readonly value: () => AsciiEffectParams;
 	readonly onChange: (params: Partial<AsciiEffectParams>) => void;
+	readonly livePreviewEnabled: () => boolean;
+	readonly onToggleLivePreview: () => void;
 	readonly locale: () => StudioLocale;
 }
 
@@ -45,7 +47,13 @@ function RangeField(props: {
 
 export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 	const copy = () => studioCopy(props.locale());
-	const presetLabel = (id: AsciiPresetId) => ({ 'matrix-green': copy().matrixGreen, 'gold-dust': copy().goldDust, 'classic-mono': copy().classicMono, 'high-detail': copy().highDetail })[id];
+	const presetLabel = (id: AsciiPresetId) =>
+		({
+			'matrix-green': copy().matrixGreen,
+			'gold-dust': copy().goldDust,
+			'classic-mono': copy().classicMono,
+			'high-detail': copy().highDetail
+		})[id];
 	return (
 		<section class="ascii-inspector" aria-label="ASCII effect controls">
 			<div class="ascii-inspector-heading">
@@ -56,10 +64,10 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 				<label class="ascii-switch">
 					<input
 						type="checkbox"
-						checked={props.value().enabled}
-						onChange={(event) => props.onChange({ enabled: event.currentTarget.checked })}
+						checked={props.livePreviewEnabled()}
+						onChange={() => props.onToggleLivePreview()}
 					/>
-					<span>{copy().enabled}</span>
+					<span>{copy().realtimePreview}</span>
 				</label>
 			</div>
 
@@ -117,7 +125,9 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 				<select
 					value={props.value().colourMode}
 					onChange={(event) =>
-						props.onChange({ colourMode: event.currentTarget.value as AsciiEffectParams['colourMode'] })
+						props.onChange({
+							colourMode: event.currentTarget.value as AsciiEffectParams['colourMode']
+						})
 					}
 				>
 					<option value="green">{copy().emeraldSignal}</option>

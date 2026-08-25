@@ -1,1 +1,4 @@
 .worktrees/
+
+# Local visual companion artifacts
+.superpowers/

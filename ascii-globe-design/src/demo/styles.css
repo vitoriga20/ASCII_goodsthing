@@ -1,0 +1,54 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  background: #071008;
+  color: #dcffd2;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(rgba(143, 255, 134, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 255, 134, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 50% 8%, #203e28 0, #071008 58%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+.app-shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 44px; }
+
+.masthead { display: flex; align-items: end; justify-content: space-between; gap: 20px; border-bottom: 1px solid #31553c; }
+.masthead p, #status { margin: 0; color: #d5ff39; font-size: 0.72rem; letter-spacing: 0.13em; }
+h1 { margin: 8px 0 14px; font-size: clamp(2.2rem, 8vw, 5.4rem); line-height: 0.88; letter-spacing: -0.1em; }
+#status { padding-bottom: 15px; text-align: right; }
+
+.globe-stage { display: grid; min-height: 440px; place-items: center; overflow: auto; }
+#globe { margin: 30px 0; color: #baffbd; cursor: grab; font-size: clamp(6px, 1vw, 12px); font-weight: 700; line-height: 0.86; text-shadow: 0 0 10px rgba(98, 255, 139, 0.9); user-select: none; }
+#globe:active { cursor: grabbing; }
+.cell-1 { color: #73ecd8; }
+.cell-2 { color: #c2ffb5; }
+
+.instrument-deck { display: grid; grid-template-columns: 126px 1fr 165px; gap: 12px; border: 1px solid #3a6444; padding: 13px; background: linear-gradient(140deg, #112217, #09120c); box-shadow: inset 0 0 38px rgba(42, 255, 104, 0.07), 0 18px 60px rgba(0, 0, 0, 0.32); }
+.speed-dial { display: grid; width: 112px; aspect-ratio: 1; align-content: center; justify-self: center; border: 1px solid #6a966f; border-radius: 50%; padding: 15px; color: #d5ff39; text-align: center; letter-spacing: 0.12em; }
+.speed-dial output { display: block; margin: 6px 0; color: #73ecd8; font-size: 1.55rem; letter-spacing: -0.08em; }
+.speed-dial input { padding: 0; accent-color: #d5ff39; }
+.readout-stack { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.readout-stack label, .action-stack label { color: #7fa987; font-size: 0.7rem; letter-spacing: 0.1em; }
+.action-stack { display: grid; gap: 8px; align-content: start; }
+input, select, button { width: 100%; min-height: 38px; margin-top: 4px; border: 1px solid #456e4d; border-radius: 0; background: #071008; color: #dcffd2; font: inherit; padding: 7px 9px; }
+button { cursor: pointer; letter-spacing: 0.08em; }
+#toggle { border-color: #d5ff39; background: #d5ff39; color: #071008; font-weight: 800; }
+button:hover { filter: brightness(1.12); }
+input:focus-visible, select:focus-visible, button:focus-visible, #globe:focus-visible { outline: 2px solid #73ecd8; outline-offset: 3px; }
+
+@media (max-width: 700px) {
+  .masthead { align-items: flex-start; flex-direction: column; padding-bottom: 13px; }
+  #status { padding-bottom: 0; text-align: left; }
+  .globe-stage { min-height: 350px; }
+  .instrument-deck { grid-template-columns: 1fr; }
+  .speed-dial { justify-self: start; }
+  .action-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+}

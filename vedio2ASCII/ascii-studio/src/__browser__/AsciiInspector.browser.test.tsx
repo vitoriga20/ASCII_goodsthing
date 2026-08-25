@@ -28,7 +28,7 @@ function renderAsciiInspector(initial: AsciiEffectParams = DEFAULT_ASCII_EFFECT)
 }
 
 describe('ASCII live preview toggle', () => {
-	it('replaces the old checkbox with a clearly stateful preview button', () => {
+	it('uses a label-and-square-rail control for live rendering', () => {
 		const { container, value } = renderAsciiInspector();
 		const toggle = container.querySelector<HTMLButtonElement>(
 			'[data-testid="ascii-live-preview-toggle"]'
@@ -37,11 +37,14 @@ describe('ASCII live preview toggle', () => {
 		expect(container.querySelector('.ascii-switch')).toBeNull();
 		expect(toggle).not.toBeNull();
 		expect(toggle?.getAttribute('aria-pressed')).toBe('false');
-		expect(toggle?.textContent).toContain('Live ASCII Preview');
+		expect(toggle?.textContent).toContain('Live rendering');
+		expect(toggle?.querySelector('.ascii-preview-toggle-rail')).not.toBeNull();
+		expect(toggle?.querySelector('.ascii-preview-toggle-state')).toBeNull();
 
 		toggle!.click();
 		expect(value().enabled).toBe(true);
 		expect(toggle?.getAttribute('aria-pressed')).toBe('true');
+		expect(toggle?.classList.contains('is-active')).toBe(true);
 	});
 
 	it('keeps live preview enabled when a preset changes the tuning', () => {

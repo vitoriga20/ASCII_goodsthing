@@ -6,6 +6,8 @@ describe('studio locale', () => {
 		expect(normalizeStudioLocale('zh-CN')).toBe('zh-CN');
 		expect(studioCopy('zh-CN').settings).toBe('设置');
 		expect(studioCopy('zh-CN').originalMonitor).toBe('原片');
+		expect(studioCopy('zh-CN').liveRendering).toBe('实时渲染');
+		expect(studioCopy('en').liveRendering).toBe('Live rendering');
 	});
 
 	it('falls back to English for an unsupported stored locale', () => {

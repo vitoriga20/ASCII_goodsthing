@@ -135,9 +135,9 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 				aria-pressed={props.value().enabled}
 				onClick={() => props.onChange({ enabled: !props.value().enabled })}
 			>
-				<span>{copy().liveAsciiPreview}</span>
-				<span class="ascii-preview-toggle-state" aria-hidden="true">
-					{props.value().enabled ? copy().asciiPreviewOn : copy().asciiPreviewOff}
+				<span class="ascii-preview-toggle-label">{copy().liveRendering}</span>
+				<span class="ascii-preview-toggle-rail" aria-hidden="true">
+					<span class="ascii-preview-toggle-block" />
 				</span>
 			</button>
 		</section>

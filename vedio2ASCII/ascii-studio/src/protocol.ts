@@ -1,5 +1,6 @@
 /** Shared types for main ↔ pipeline worker messages. */
 import type { DiagnosticSnapshot, RecentError, RecoveryAction } from './diagnostics/types';
+import type { AsciiEffectParams } from './engine/ascii-effect';
 import type { SilenceDetectionParams, SilenceRegion } from './engine/silence-detector';
 
 export type { SilenceDetectionParams, SilenceRegion };
@@ -2400,6 +2401,11 @@ export interface SceneDoc {
 	scenes: SceneDefinition[];
 }
 
+export interface SetAsciiEffectCommand {
+	type: 'set-ascii-effect';
+	params: Partial<AsciiEffectParams>;
+}
+
 export type WorkerCommand =
 	| WorkerInit
 	| WorkerInitV2
@@ -2409,6 +2415,7 @@ export type WorkerCommand =
 	| { type: 'seek'; time: number }
 	| { type: 'step'; direction: 1 | -1 }
 	| { type: 'set-loop'; enabled: boolean }
+	| SetAsciiEffectCommand
 	| { type: 'export-probe' }
 	| { type: 'export-start'; settings: ExportSettings; output?: FileSystemFileHandle | null }
 	| { type: 'export-cancel' }

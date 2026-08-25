@@ -107,6 +107,7 @@ import {
 	type CaptionStyle,
 	type CaptionTrack
 } from './captions/types';
+import { DEFAULT_ASCII_EFFECT, normalizeAsciiEffect } from './ascii-effect';
 import { createAsrCaptionTrack } from './asr/caption-track';
 import { createTranslatedCaptionTrack } from './language-tools/caption-track';
 import {
@@ -792,6 +793,7 @@ let adaptive: AdaptiveResolution | null = null;
 // controller rebuilds in setupPlayback (edits/format changes) like the play state.
 let loopEnabled = false;
 let probeDone = false;
+let asciiEffect = DEFAULT_ASCII_EFFECT;
 let timeline: Timeline = createEmptyTimeline();
 let captionTracks: CaptionTrack[] = [];
 let transitions: TimelineTransition[] = [];
@@ -9045,6 +9047,9 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 			break;
 		case 'set-loop':
 			handleSetLoop(cmd.enabled);
+			break;
+		case 'set-ascii-effect':
+			asciiEffect = normalizeAsciiEffect({ ...asciiEffect, ...cmd.params });
 			break;
 		case 'export-probe':
 			void handleExportProbe();

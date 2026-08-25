@@ -4,10 +4,12 @@ import {
 	type AsciiEffectParams,
 	type AsciiPresetId
 } from '../engine/ascii-effect';
+import { studioCopy, type StudioLocale } from './locale';
 
 interface AsciiInspectorProps {
 	readonly value: () => AsciiEffectParams;
 	readonly onChange: (params: Partial<AsciiEffectParams>) => void;
+	readonly locale: () => StudioLocale;
 }
 
 const PRESETS: ReadonlyArray<{ readonly id: AsciiPresetId; readonly label: string }> = [
@@ -42,12 +44,13 @@ function RangeField(props: {
 }
 
 export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
+	const copy = () => studioCopy(props.locale());
 	return (
 		<section class="ascii-inspector" aria-label="ASCII effect controls">
 			<div class="ascii-inspector-heading">
 				<div>
-					<p class="panel-kicker">ASCII TREATMENT</p>
-					<h2>Glyph Transform</h2>
+					<p class="panel-kicker">{copy().asciiTreatment}</p>
+					<h2>{copy().glyphTransform}</h2>
 				</div>
 				<label class="ascii-switch">
 					<input
@@ -55,7 +58,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 						checked={props.value().enabled}
 						onChange={(event) => props.onChange({ enabled: event.currentTarget.checked })}
 					/>
-					<span>Enabled</span>
+					<span>{copy().enabled}</span>
 				</label>
 			</div>
 
@@ -75,7 +78,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 
 			<div class="ascii-fields">
 				<RangeField
-					label="Density"
+					label={copy().density}
 					value={props.value().density}
 					min={12}
 					max={180}
@@ -83,7 +86,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 					onInput={(density) => props.onChange({ density })}
 				/>
 				<RangeField
-					label="Glyph scale"
+					label={copy().glyphScale}
 					value={props.value().glyphScale}
 					min={0.5}
 					max={3}
@@ -91,7 +94,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 					onInput={(glyphScale) => props.onChange({ glyphScale })}
 				/>
 				<RangeField
-					label="Contrast"
+					label={copy().contrast}
 					value={props.value().contrast}
 					min={0}
 					max={3}
@@ -99,7 +102,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 					onInput={(contrast) => props.onChange({ contrast })}
 				/>
 				<RangeField
-					label="Edge detail"
+					label={copy().edgeDetail}
 					value={props.value().edgeStrength}
 					min={0}
 					max={1}
@@ -109,7 +112,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 			</div>
 
 			<label class="ascii-select-field">
-				<span>Colour treatment</span>
+				<span>{copy().colourTreatment}</span>
 				<select
 					value={props.value().colourMode}
 					onChange={(event) =>

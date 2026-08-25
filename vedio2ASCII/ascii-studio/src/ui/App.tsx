@@ -82,6 +82,7 @@ import { PreviewCanvas } from './PreviewCanvas';
 import { SourceMonitor } from './SourceMonitor';
 import { AsciiInspector } from './AsciiInspector';
 import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from '../engine/ascii-effect';
+import { readStudioLocale, studioCopy, writeStudioLocale, type StudioLocale } from './locale';
 import { PreviewGizmo } from './PreviewGizmo';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { buildUiDiagnosticSnapshot } from './diagnostic-snapshot';
@@ -414,6 +415,8 @@ export function App() {
 	const [exportReady, setExportReady] = createSignal(false);
 	const [asciiEffect, setAsciiEffect] = createSignal<AsciiEffectParams>(DEFAULT_ASCII_EFFECT);
 	const [sourcePreviewUrl, setSourcePreviewUrl] = createSignal<string | null>(null);
+	const [studioLocale, setStudioLocale] = createSignal<StudioLocale>(readStudioLocale());
+	const studioText = () => studioCopy(studioLocale());
 	const [capabilityPanelOpen, setCapabilityPanelOpen] = createSignal(false);
 	// In-app user guide route (/docs[/section]); null means the editor view.
 	const [docsSlug, setDocsSlug] = createSignal<string | null>(
@@ -1915,6 +1918,11 @@ export function App() {
 	function updateAsciiEffect(params: Partial<AsciiEffectParams>): void {
 		setAsciiEffect((current) => ({ ...current, ...params }));
 		bridge?.send({ type: 'set-ascii-effect', params });
+	}
+
+	function changeStudioLocale(locale: StudioLocale): void {
+		setStudioLocale(locale);
+		writeStudioLocale(locale);
 	}
 
 	// Phase 46: the main thread owns the MediaStream (getDisplayMedia needs a
@@ -4211,6 +4219,8 @@ export function App() {
 					playing={clock.playing}
 					currentTime={clock.currentTime}
 					duration={clock.duration}
+					locale={studioLocale}
+					onLocaleChange={changeStudioLocale}
 					importAccept={VIDEO_ACCEPT}
 					onImportFile={importMedia}
 					onPickImport={pickImportMedia}
@@ -4681,9 +4691,10 @@ export function App() {
 									src={sourcePreviewUrl}
 									currentTime={clock.currentTime}
 									playing={clock.playing}
+									locale={studioLocale}
 								/>
 								<section class="ascii-monitor" aria-label="ASCII program preview">
-									<div class="monitor-label"><span>ASCII PROGRAM</span><span>GPU</span></div>
+									<div class="monitor-label"><span>{studioText().asciiProgram}</span><span>{studioText().gpu}</span></div>
 									<Show when={previewKey() + 1} keyed>
 										{(_k) => (
 											<PreviewCanvas onOffscreenReady={sendInit} onCanvasEl={setPreviewCanvasEl} />
@@ -5042,7 +5053,7 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('inspector')}
 										>
-											<AsciiInspector value={asciiEffect} onChange={updateAsciiEffect} />
+											<AsciiInspector value={asciiEffect} onChange={updateAsciiEffect} locale={studioLocale} />
 										<Inspector
 												metadata={metadata()}
 												selectedClip={selectedClip()}

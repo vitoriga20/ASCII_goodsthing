@@ -220,3 +220,70 @@ body {
 		grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
 	}
 }
+
+.locale-settings-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.34rem;
+	min-height: 2rem;
+	padding: 0 0.55rem;
+	border: 1px solid rgb(96 215 165 / 24%);
+	border-radius: 0.3rem;
+	background: rgb(9 27 19 / 84%);
+	color: rgb(211 241 224 / 90%);
+	font: inherit;
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	cursor: pointer;
+}
+
+.locale-settings-button:hover,
+.locale-settings-button:focus-visible {
+	border-color: #73dfad;
+	background: rgb(34 86 61 / 72%);
+	outline: none;
+}
+
+.locale-settings-popover {
+	z-index: 90;
+	display: grid;
+	gap: 0.58rem;
+	min-width: 10.5rem;
+	padding: 0.72rem;
+	background: #08150f;
+}
+
+.locale-settings-popover p {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: var(--text-xs);
+}
+
+.locale-settings-popover [role='group'] {
+	display: grid;
+	gap: 0.32rem;
+}
+
+.locale-option {
+	min-height: 2rem;
+	border: 1px solid transparent;
+	border-radius: 0.28rem;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: var(--text-xs);
+	text-align: left;
+	padding: 0 0.5rem;
+	cursor: pointer;
+}
+
+.locale-option:hover,
+.locale-option:focus-visible,
+.locale-option.is-active {
+	border-color: rgb(104 218 170 / 34%);
+	background: rgb(33 82 58 / 58%);
+	color: #e7f5ed;
+	outline: none;
+}

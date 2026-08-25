@@ -1,9 +1,11 @@
 import { createEffect, Show } from 'solid-js';
+import { studioCopy, type StudioLocale } from './locale';
 
 interface SourceMonitorProps {
 	readonly src: () => string | null;
 	readonly currentTime: () => number;
 	readonly playing: () => boolean;
+	readonly locale: () => StudioLocale;
 }
 
 /**
@@ -12,6 +14,7 @@ interface SourceMonitorProps {
  * comparison immediate without adding a second media processing pipeline.
  */
 export function SourceMonitor(props: SourceMonitorProps) {
+	const copy = () => studioCopy(props.locale());
 	let video: HTMLVideoElement | undefined;
 
 	createEffect(() => {
@@ -31,12 +34,12 @@ export function SourceMonitor(props: SourceMonitorProps) {
 	return (
 		<section class="source-monitor" aria-label="Original source preview">
 			<div class="monitor-label">
-				<span>ORIGINAL</span>
-				<span>LIVE</span>
+				<span>{copy().originalMonitor}</span>
+				<span>{copy().live}</span>
 			</div>
 			<Show
 				when={props.src()}
-				fallback={<p class="monitor-empty">导入视频后在此查看原片</p>}
+				fallback={<p class="monitor-empty">{copy().emptySource}</p>}
 			>
 				{(src) => (
 					<video

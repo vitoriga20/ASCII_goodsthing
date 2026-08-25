@@ -27,6 +27,8 @@ import { Button } from './components/button';
 import type { CapabilityTier } from './capabilities';
 import type { MediaMetadata } from '../protocol';
 import { MeterStrip } from './MeterStrip';
+import { LocaleSettings } from './LocaleSettings';
+import type { StudioLocale } from './locale';
 import { modifierGlyphs } from './platform';
 import {
 	buildCommandActions,
@@ -95,6 +97,8 @@ interface ToolbarProps {
 	masterGain: number;
 	meterSab: SharedArrayBuffer | null;
 	onMasterGain: (gain: number) => void;
+	locale?: () => StudioLocale;
+	onLocaleChange?: (locale: StudioLocale) => void;
 	exportControl?: JSX.Element;
 }
 
@@ -126,6 +130,7 @@ function formatToolbarDuration(seconds: number): string {
 }
 
 export function Toolbar(props: ToolbarProps) {
+	const activeLocale = () => props.locale?.() ?? 'en';
 	const hasVideo = () => props.metadata?.video != null;
 	const transportDisabled = () => props.transportDisabled || !hasVideo();
 	const [commandOpen, setCommandOpen] = createSignal(false);
@@ -530,6 +535,7 @@ export function Toolbar(props: ToolbarProps) {
 							</span>
 						</label>
 					</div>
+					<LocaleSettings locale={activeLocale} onLocaleChange={(locale) => props.onLocaleChange?.(locale)} />
 					{props.exportControl}
 				</div>
 			</div>

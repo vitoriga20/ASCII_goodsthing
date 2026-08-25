@@ -414,6 +414,18 @@ export function App() {
 	const [previewReady, setPreviewReady] = createSignal(false);
 	const [exportReady, setExportReady] = createSignal(false);
 	const [asciiEffect, setAsciiEffect] = createSignal<AsciiEffectParams>(DEFAULT_ASCII_EFFECT);
+	const [asciiPreviewPending, setAsciiPreviewPending] = createSignal(false);
+	let asciiPreviewNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearAsciiPreviewNotice(): void {
+		if (asciiPreviewNoticeTimer !== null) {
+			clearTimeout(asciiPreviewNoticeTimer);
+			asciiPreviewNoticeTimer = null;
+		}
+		setAsciiPreviewPending(false);
+	}
+
+	onCleanup(clearAsciiPreviewNotice);
 	const [sourcePreviewUrl, setSourcePreviewUrl] = createSignal<string | null>(null);
 	const studioText = () => studioCopy(studioLocale());
 	const [capabilityPanelOpen, setCapabilityPanelOpen] = createSignal(false);
@@ -1916,6 +1928,13 @@ export function App() {
 
 	function updateAsciiEffect(params: Partial<AsciiEffectParams>): void {
 		setAsciiEffect((current) => ({ ...current, ...params }));
+		if (typeof params.enabled === 'boolean') {
+			clearAsciiPreviewNotice();
+			asciiPreviewNoticeTimer = setTimeout(() => {
+				asciiPreviewNoticeTimer = null;
+				setAsciiPreviewPending(true);
+			}, 350);
+		}
 		bridge?.send({ type: 'set-ascii-effect', params });
 	}
 
@@ -2742,6 +2761,9 @@ export function App() {
 					setMetadata(msg.metadata);
 					clearCompatibilityPreview();
 				}
+				break;
+			case 'ascii-preview-applied':
+				if (msg.enabled === asciiEffect().enabled) clearAsciiPreviewNotice();
 				break;
 			case 'preview-resolution':
 				setPreviewLabel(msg.resolution.label);
@@ -4692,6 +4714,11 @@ export function App() {
 								/>
 								<section class="ascii-monitor" aria-label="ASCII program preview">
 									<div class="monitor-label"><span>{studioText().asciiProgram}</span><span>{studioText().gpu}</span></div>
+									<Show when={asciiPreviewPending()}>
+										<div class="ascii-preview-pending" role="status" aria-live="polite">
+											{studioText().generatingAsciiFrame}
+										</div>
+									</Show>
 									<Show when={previewKey() + 1} keyed>
 										{(_k) => (
 											<PreviewCanvas onOffscreenReady={sendInit} onCanvasEl={setPreviewCanvasEl} />

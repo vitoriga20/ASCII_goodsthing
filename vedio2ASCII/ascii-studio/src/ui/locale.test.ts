@@ -8,6 +8,8 @@ describe('studio locale', () => {
 		expect(studioCopy('zh-CN').originalMonitor).toBe('原片');
 		expect(studioCopy('zh-CN').liveRendering).toBe('实时渲染');
 		expect(studioCopy('en').liveRendering).toBe('Live rendering');
+		expect(studioCopy('zh-CN').generatingAsciiFrame).toBe('正在生成 ASCII 帧…');
+		expect(studioCopy('en').generatingAsciiFrame).toBe('Generating ASCII frame…');
 	});
 
 	it('falls back to English for an unsupported stored locale', () => {

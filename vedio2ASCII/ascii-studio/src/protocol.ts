@@ -2767,6 +2767,7 @@ export type WorkerStateMessage =
 			unresolvedSources: SourceDescriptorSnapshot[];
 			message: string;
 	  }
+	| { type: 'ascii-preview-applied'; enabled: boolean }
 	| { type: 'preview-resolution'; resolution: PreviewResolution }
 	| { type: 'probe-result'; probe: ThroughputProbe }
 	| {

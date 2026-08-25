@@ -4,6 +4,7 @@ import {
 	type WorkerCommand,
 	type WorkerStateMessage
 } from './protocol';
+import protocolText from './protocol.ts?raw';
 
 describe('voice cleanup protocol', () => {
 	it('keeps analysis and settings messages structured-clone safe', () => {
@@ -28,5 +29,8 @@ describe('voice cleanup protocol', () => {
 		expect(structuredClone(analyse)).toEqual(analyse);
 		expect(structuredClone(result)).toEqual(result);
 		expect(structuredClone(update)).toEqual(update);
+	});
+	it('declares an applied ASCII preview command', () => {
+		expect(protocolText).toContain("| { type: 'ascii-preview-applied'; enabled: boolean }");
 	});
 });

@@ -45,7 +45,17 @@ function RangeField(props: {
 
 export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 	const copy = () => studioCopy(props.locale());
-	const presetLabel = (id: AsciiPresetId) => ({ 'matrix-green': copy().matrixGreen, 'gold-dust': copy().goldDust, 'classic-mono': copy().classicMono, 'high-detail': copy().highDetail })[id];
+	const presetLabel = (id: AsciiPresetId) =>
+		({
+			'matrix-green': copy().matrixGreen,
+			'gold-dust': copy().goldDust,
+			'classic-mono': copy().classicMono,
+			'high-detail': copy().highDetail
+		})[id];
+	const applyPreset = (id: AsciiPresetId) => {
+		const { enabled: _enabled, ...params } = applyAsciiPreset(id);
+		props.onChange(params);
+	};
 	return (
 		<section class="ascii-inspector" aria-label="ASCII effect controls">
 			<div class="ascii-inspector-heading">
@@ -53,24 +63,12 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 					<p class="panel-kicker">{copy().asciiTreatment}</p>
 					<h2>{copy().glyphTransform}</h2>
 				</div>
-				<label class="ascii-switch">
-					<input
-						type="checkbox"
-						checked={props.value().enabled}
-						onChange={(event) => props.onChange({ enabled: event.currentTarget.checked })}
-					/>
-					<span>{copy().enabled}</span>
-				</label>
 			</div>
 
 			<div class="ascii-preset-grid" role="group" aria-label="ASCII presets">
 				<For each={PRESETS}>
 					{(preset) => (
-						<button
-							type="button"
-							class="ascii-preset"
-							onClick={() => props.onChange(applyAsciiPreset(preset.id))}
-						>
+						<button type="button" class="ascii-preset" onClick={() => applyPreset(preset.id)}>
 							{presetLabel(preset.id)}
 						</button>
 					)}
@@ -117,7 +115,9 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 				<select
 					value={props.value().colourMode}
 					onChange={(event) =>
-						props.onChange({ colourMode: event.currentTarget.value as AsciiEffectParams['colourMode'] })
+						props.onChange({
+							colourMode: event.currentTarget.value as AsciiEffectParams['colourMode']
+						})
 					}
 				>
 					<option value="green">{copy().emeraldSignal}</option>
@@ -126,6 +126,20 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 					<option value="mono">{copy().classicMono}</option>
 				</select>
 			</label>
+
+			<button
+				type="button"
+				class="ascii-preview-toggle"
+				classList={{ 'is-active': props.value().enabled }}
+				data-testid="ascii-live-preview-toggle"
+				aria-pressed={props.value().enabled}
+				onClick={() => props.onChange({ enabled: !props.value().enabled })}
+			>
+				<span>{copy().liveAsciiPreview}</span>
+				<span class="ascii-preview-toggle-state" aria-hidden="true">
+					{props.value().enabled ? copy().asciiPreviewOn : copy().asciiPreviewOff}
+				</span>
+			</button>
 		</section>
 	);
 }

@@ -15,7 +15,7 @@ export interface AsciiEffectParams {
 }
 
 export const DEFAULT_ASCII_EFFECT: AsciiEffectParams = {
-	enabled: true,
+	enabled: false,
 	density: 56,
 	glyphScale: 1,
 	brightness: 0,

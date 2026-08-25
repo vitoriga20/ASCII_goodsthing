@@ -9051,6 +9051,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 		case 'set-ascii-effect':
 			asciiEffect = normalizeAsciiEffect({ ...asciiEffect, ...cmd.params });
 			renderer?.setAsciiEffect(asciiEffect);
+			playback?.refresh();
 			break;
 		case 'export-probe':
 			void handleExportProbe();

@@ -1,3 +1,5 @@
+import { studioCopy, studioLocale } from './locale';
+
 export const SIDE_RAIL_TABS = [
 	{ id: 'inspector', label: 'Inspector' },
 	{ id: 'text', label: 'Text' },
@@ -54,7 +56,13 @@ export function isSideRailTab(value: string | null): value is SideRailTab {
 
 /** Visible label for a primary rail destination (expand strip, aria, titles). */
 export function sideRailTabLabel(tab: SideRailTab): string {
-	return SIDE_RAIL_TABS.find((entry) => entry.id === tab)?.label ?? 'Inspector';
+	const copy = studioCopy(studioLocale());
+	switch (tab) {
+		case 'inspector': return copy.inspector;
+		case 'text': return copy.text;
+		case 'audio': return copy.audio;
+		case 'capture': return copy.capture;
+	}
 }
 
 export function sideRailTabTriggerId(tab: SideRailTab): string {

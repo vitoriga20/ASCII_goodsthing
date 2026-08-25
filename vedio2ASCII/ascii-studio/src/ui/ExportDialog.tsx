@@ -1,3 +1,4 @@
+import { studioCopy, studioLocale } from './locale';
 import { createEffect, createMemo, createSignal, For, Show, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { Popover } from '@ark-ui/solid/popover';
@@ -114,6 +115,7 @@ function disabledCodecReason(codec: ExportVideoCodec, probe: CapabilityProbeResu
 
 /** Export UI — Phase 6 shell, Phase 17 settings, Phase 24 presets + queue. */
 export function ExportDialog(props: ExportDialogProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [open, setOpen] = createSignal(false);
 	const [settings, setSettings] = createSignal<ExportSettings>(defaultSettings('quality'));
 	const [useRange, setUseRange] = createSignal(false);
@@ -352,7 +354,7 @@ export function ExportDialog(props: ExportDialogProps) {
 			</Popover.Trigger>
 			<Portal>
 				<Popover.Positioner>
-					<Popover.Content class="export-popover panel" aria-label="Export">
+					<Popover.Content class="export-popover panel" aria-label={copy().export}>
 						{/* Saved presets selector */}
 						<Show when={props.presets.length > 0}>
 							<p class="export-eyebrow">

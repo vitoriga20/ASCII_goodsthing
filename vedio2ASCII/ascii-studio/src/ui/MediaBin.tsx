@@ -14,6 +14,7 @@ import {
 } from 'lucide-solid';
 import { formatClock } from '../lib/format';
 import type { MediaAssetSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 import {
 	mediaTooltipMessages,
 	passiveMediaInfoMessages,
@@ -242,17 +243,18 @@ function BinThumbnail(props: {
 }
 
 export function MediaBin(props: MediaBinProps) {
+	const copy = () => studioCopy(studioLocale());
 	return (
-		<section class="media-bin panel" aria-label="Media bin">
+		<section class="media-bin panel" aria-label={copy().media}>
 			<header class="media-bin-header">
-				<span class="media-bin-title">Media</span>
+				<span class="media-bin-title">{copy().media}</span>
 				<span class="media-bin-count">{props.assets().length}</span>
 			</header>
 			<Show
 				when={props.assets().length > 0}
 				fallback={
 					<p class="media-bin-empty">
-						Your imported files will live here. Drag one in or click Import.
+						{copy().dropHere}
 					</p>
 				}
 			>

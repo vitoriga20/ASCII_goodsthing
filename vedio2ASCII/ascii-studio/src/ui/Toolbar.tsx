@@ -28,7 +28,7 @@ import type { CapabilityTier } from './capabilities';
 import type { MediaMetadata } from '../protocol';
 import { MeterStrip } from './MeterStrip';
 import { LocaleSettings } from './LocaleSettings';
-import type { StudioLocale } from './locale';
+import { studioCopy, type StudioLocale } from './locale';
 import { modifierGlyphs } from './platform';
 import {
 	buildCommandActions,
@@ -131,6 +131,8 @@ function formatToolbarDuration(seconds: number): string {
 
 export function Toolbar(props: ToolbarProps) {
 	const activeLocale = () => props.locale?.() ?? 'en';
+	const copy = () => studioCopy(activeLocale());
+	const menuLabel = (label: string) => ({ Project: copy().project, Edit: copy().edit, View: copy().view, Clip: copy().clip, Timeline: copy().timeline, Help: copy().help }[label] ?? label);
 	const hasVideo = () => props.metadata?.video != null;
 	const transportDisabled = () => props.transportDisabled || !hasVideo();
 	const [commandOpen, setCommandOpen] = createSignal(false);
@@ -288,15 +290,15 @@ export function Toolbar(props: ToolbarProps) {
 						<span class="app-kicker">Client NLE</span>
 					</div>
 				</div>
-				<nav class="toolbar-menu-nav" aria-label="Application menu">
+				<nav class="toolbar-menu-nav" aria-label={copy().settings}>
 					<For each={menuBarGroups()}>
 						{(group) => (
 							<Menu.Root
 								onSelect={(details) => runMenuItem(group, details.value)}
 								positioning={{ placement: 'bottom-start', gutter: 6 }}
 							>
-								<Menu.Trigger class="toolbar-menu-item" title={`Open ${group.label} menu`}>
-									{group.label}
+								<Menu.Trigger class="toolbar-menu-item" title={`Open ${menuLabel(group.label)} menu`}>
+									{menuLabel(group.label)}
 								</Menu.Trigger>
 								<Portal>
 									<Menu.Positioner>
@@ -333,7 +335,7 @@ export function Toolbar(props: ToolbarProps) {
 				>
 					<Popover.Trigger class="command-search" aria-label="Search actions">
 						<Search size={13} aria-hidden="true" />
-						<span>Search actions, panels, clips…</span>
+						<span>{copy().searchActions}</span>
 						<kbd>{glyphs.mod}</kbd>
 						<kbd>K</kbd>
 					</Popover.Trigger>
@@ -387,7 +389,7 @@ export function Toolbar(props: ToolbarProps) {
 						multiple
 						onChange={handleImportInput}
 						disabled={props.importBlocked}
-						aria-label="Import media"
+						aria-label={copy().import}
 						title={props.importHint ?? undefined}
 						hidden
 					/>
@@ -395,7 +397,7 @@ export function Toolbar(props: ToolbarProps) {
 				<div class="toolbar-center">
 					<span
 						class="file-name"
-						title={props.metadata?.fileName ?? 'Drop or import a file to get started'}
+						title={props.metadata?.fileName ?? copy().dropToStart}
 					>
 						<Show when={props.metadata} fallback="Drop or import a file to get started">
 							{(meta) => meta().fileName}
@@ -515,7 +517,7 @@ export function Toolbar(props: ToolbarProps) {
 					<div class="master-mix" role="group" aria-label="Master mix">
 						<MeterStrip meterSab={props.meterSab} />
 						<label class="master-fader">
-							<span class="master-fader-label">Master</span>
+							<span class="master-fader-label">{copy().master}</span>
 							<input
 								type="range"
 								class="master-fader-input"
@@ -550,7 +552,7 @@ export function Toolbar(props: ToolbarProps) {
 					)}
 				>
 					<Gauge size={11} aria-hidden="true" />
-					{props.pipelineLabel}
+					{activeLocale() === 'zh-CN' && props.pipelineLabel === 'Accelerated' ? copy().accelerated : props.pipelineLabel}
 				</span>
 				<span class="pipeline-chip">
 					<Cpu size={11} aria-hidden="true" />
@@ -580,7 +582,7 @@ export function Toolbar(props: ToolbarProps) {
 					title="Go live — stream to a WHIP endpoint"
 				>
 					<Radio size={11} aria-hidden="true" />
-					{props.publishLive ? 'Live' : 'Go Live'}
+					{props.publishLive ? 'Live' : copy().goLive}
 				</button>
 				{/*
 				 * IA-T1/D13: the launcher strip is collapsed to frequent + contextual

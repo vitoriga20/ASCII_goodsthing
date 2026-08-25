@@ -1,3 +1,4 @@
+import { studioCopy, studioLocale } from './locale';
 import { createSignal, For, Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { Popover } from '@ark-ui/solid/popover';
@@ -47,6 +48,7 @@ async function pickDirectory(
 }
 
 export function BundleDialog(props: BundleDialogProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [open, setOpen] = createSignal(false);
 	const [relocate, setRelocate] = createSignal(false);
 	const [pickerError, setPickerError] = createSignal<string | null>(null);
@@ -101,7 +103,7 @@ export function BundleDialog(props: BundleDialogProps) {
 				}
 			>
 				<FolderArchive size={14} aria-hidden="true" />
-				Project
+				{copy().project}
 			</Popover.Trigger>
 			<Portal>
 				<Popover.Positioner>

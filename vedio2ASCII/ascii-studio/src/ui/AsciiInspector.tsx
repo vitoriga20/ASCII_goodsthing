@@ -45,6 +45,7 @@ function RangeField(props: {
 
 export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 	const copy = () => studioCopy(props.locale());
+	const presetLabel = (id: AsciiPresetId) => ({ 'matrix-green': copy().matrixGreen, 'gold-dust': copy().goldDust, 'classic-mono': copy().classicMono, 'high-detail': copy().highDetail })[id];
 	return (
 		<section class="ascii-inspector" aria-label="ASCII effect controls">
 			<div class="ascii-inspector-heading">
@@ -70,7 +71,7 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 							class="ascii-preset"
 							onClick={() => props.onChange(applyAsciiPreset(preset.id))}
 						>
-							{preset.label}
+							{presetLabel(preset.id)}
 						</button>
 					)}
 				</For>
@@ -119,10 +120,10 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 						props.onChange({ colourMode: event.currentTarget.value as AsciiEffectParams['colourMode'] })
 					}
 				>
-					<option value="green">Emerald signal</option>
-					<option value="gold">Gold dust</option>
-					<option value="original">Keep source colour</option>
-					<option value="mono">Classic mono</option>
+					<option value="green">{copy().emeraldSignal}</option>
+					<option value="gold">{copy().goldDust}</option>
+					<option value="original">{copy().keepSourceColour}</option>
+					<option value="mono">{copy().classicMono}</option>
 				</select>
 			</label>
 		</section>

@@ -28,6 +28,7 @@ import { clipLocalTime, hasKeyframeTrack, keyframeAt, sortedKeyframes } from './
 import { ZoomPresetPanel } from './ZoomPresetPanel';
 import { AutoZoomPanel } from './AutoZoomPanel';
 import { CalloutInspector } from './CalloutInspector';
+import { studioCopy, studioLocale } from './locale';
 import { RailEmpty } from './RailEmpty';
 import { PaddedBackgroundPanel } from './PaddedBackgroundPanel';
 
@@ -517,6 +518,7 @@ type FadeDraft = Pick<SelectedClipFades, 'audioFadeIn' | 'audioFadeOut'>;
 type TransformDraft = TransformParamsSnapshot;
 
 export function Inspector(props: InspectorProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [draft, setDraft] = createSignal<ClipEffectParamsSnapshot | null>(null);
 	const [mixDraft, setMixDraft] = createSignal<MixDraft | null>(null);
 	const [fadeDraft, setFadeDraft] = createSignal<FadeDraft | null>(null);
@@ -1230,12 +1232,12 @@ export function Inspector(props: InspectorProps) {
 
 	return (
 		<aside class="inspector panel">
-			<h2 class="panel-title">Inspector</h2>
+			<h2 class="panel-title">{copy().inspector}</h2>
 			<Show
 				when={props.selectedClip}
 				fallback={
-					<RailEmpty title="Select a clip to edit its properties">
-						Click a clip on the timeline to adjust timing, effects, transform, and colour.
+					<RailEmpty title={copy().selectClip}>
+						{copy().selectClipHint}
 					</RailEmpty>
 				}
 			>

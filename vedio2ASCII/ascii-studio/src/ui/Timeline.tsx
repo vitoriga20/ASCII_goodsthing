@@ -19,6 +19,7 @@ import { TimelineTrack } from './TimelineTrack';
 import { ASSET_DRAG_MIME } from './MediaBin';
 import type { ThumbnailEntry } from './thumbnail-store';
 import { modifierGlyphs } from './platform';
+import { studioCopy, studioLocale } from './locale';
 import {
 	type ClipEffectParamsSnapshot,
 	type TimelineClipMove,
@@ -147,6 +148,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 }
 
 export function Timeline(props: TimelineProps) {
+	const copy = () => studioCopy(studioLocale());
 	const glyphs = modifierGlyphs();
 	const fps = () => props.frameRate?.() ?? DEFAULT_FPS;
 	const [pxPerSecond, setPxPerSecond] = createSignal(DEFAULT_PX_PER_SECOND);
@@ -553,13 +555,13 @@ export function Timeline(props: TimelineProps) {
 					<span class="timecode-sep">/</span>
 					<span class="timecode tabular-nums muted">{formatTimecode(props.duration(), fps())}</span>
 				</div>
-				<div class="timeline-actions" role="group" aria-label="Timeline tools">
+				<div class="timeline-actions" role="group" aria-label={copy().timeline}>
 					<button
 						type="button"
 						class="timeline-tool-button"
 						onClick={() => props.onAddTrack('video')}
-						aria-label="Add video track"
-						title="Add video track"
+						aria-label={copy().addVideoTrack}
+						title={copy().addVideoTrack}
 					>
 						<Film size={13} aria-hidden="true" />+
 					</button>
@@ -567,8 +569,8 @@ export function Timeline(props: TimelineProps) {
 						type="button"
 						class="timeline-tool-button"
 						onClick={() => props.onAddTrack('audio')}
-						aria-label="Add audio track"
-						title="Add audio track"
+						aria-label={copy().addAudioTrack}
+						title={copy().addAudioTrack}
 					>
 						<Music2 size={13} aria-hidden="true" />+
 					</button>
@@ -576,8 +578,8 @@ export function Timeline(props: TimelineProps) {
 						type="button"
 						class="timeline-tool-button"
 						onClick={() => props.onAddTitle(boundedCurrentTime())}
-						aria-label="Add title clip"
-						title="Add title at playhead"
+						aria-label={copy().addTitle}
+						title={copy().addTitle}
 					>
 						<Type size={13} aria-hidden="true" />+
 					</button>
@@ -680,7 +682,7 @@ export function Timeline(props: TimelineProps) {
 			</div>
 			<Show
 				when={props.hasMedia}
-				fallback={<p class="placeholder-text">Drag a file here, or click Import</p>}
+				fallback={<p class="placeholder-text">{copy().dropHere}</p>}
 			>
 				<div class="timeline-track-wrapper">
 					<div class="timeline-label-column">

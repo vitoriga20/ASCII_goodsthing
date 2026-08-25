@@ -82,7 +82,7 @@ import { PreviewCanvas } from './PreviewCanvas';
 import { SourceMonitor } from './SourceMonitor';
 import { AsciiInspector } from './AsciiInspector';
 import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from '../engine/ascii-effect';
-import { readStudioLocale, studioCopy, writeStudioLocale, type StudioLocale } from './locale';
+import { setStudioLocale, studioCopy, studioLocale, type StudioLocale } from './locale';
 import { PreviewGizmo } from './PreviewGizmo';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { buildUiDiagnosticSnapshot } from './diagnostic-snapshot';
@@ -415,7 +415,6 @@ export function App() {
 	const [exportReady, setExportReady] = createSignal(false);
 	const [asciiEffect, setAsciiEffect] = createSignal<AsciiEffectParams>(DEFAULT_ASCII_EFFECT);
 	const [sourcePreviewUrl, setSourcePreviewUrl] = createSignal<string | null>(null);
-	const [studioLocale, setStudioLocale] = createSignal<StudioLocale>(readStudioLocale());
 	const studioText = () => studioCopy(studioLocale());
 	const [capabilityPanelOpen, setCapabilityPanelOpen] = createSignal(false);
 	// In-app user guide route (/docs[/section]); null means the editor view.
@@ -1922,7 +1921,6 @@ export function App() {
 
 	function changeStudioLocale(locale: StudioLocale): void {
 		setStudioLocale(locale);
-		writeStudioLocale(locale);
 	}
 
 	// Phase 46: the main thread owns the MediaStream (getDisplayMedia needs a
@@ -4466,7 +4464,7 @@ export function App() {
 								when={restoreOffer()}
 								fallback={
 									<>
-										<p class="restore-banner-title">Offline media</p>
+										<p class="restore-banner-title">{studioText().offlineMedia}</p>
 										<p class="restore-banner-detail">
 											{unresolvedSources().length} source
 											{unresolvedSources().length === 1 ? '' : 's'} need re-linking.
@@ -4477,11 +4475,10 @@ export function App() {
 								{(offer) => (
 									<>
 										<p class="restore-banner-title">
-											Autosave from {formatSavedAt(offer().savedAt)}
+											{studioText().autosaveFrom} {formatSavedAt(offer().savedAt)}
 										</p>
 										<p class="restore-banner-detail">
-											{offer().sources.length} source
-											{offer().sources.length === 1 ? '' : 's'} in the saved project.
+											{offer().sources.length} {studioText().savedSources}
 										</p>
 									</>
 								)}
@@ -4569,10 +4566,10 @@ export function App() {
 							<aside class="dock-left" aria-label="Library">
 								<SecondaryRailTabs
 									idPrefix="dock"
-									label="Library sections"
+									label={studioLocale() === 'zh-CN' ? '素材库分区' : 'Library sections'}
 									tabs={[
-										{ id: 'media' as const, label: 'Media' },
-										{ id: 'beats' as const, label: 'Beats' }
+										{ id: 'media' as const, label: studioText().media },
+										{ id: 'beats' as const, label: studioText().beats }
 									]}
 									value={activeDockTab()}
 									onSelect={setActiveDockTab}
@@ -4920,20 +4917,20 @@ export function App() {
 										</p>
 										<p class="preview-empty-title">
 											{previewSurfaceAvailable()
-												? 'Drop or import a file to get started'
+												? studioText().dropToStart
 												: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
 													? 'Preview unavailable'
-													: 'Drop or import a file to get started'}
+													: studioText().dropToStart}
 										</p>
 										<p class="preview-empty-copy">
 											{previewSurfaceAvailable()
-												? 'Drag a file here, or click Import'
+												? studioText().dropHere
 												: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
 													? (limitedIssue() ??
 														(compatibilityImportEnabled()
 															? 'You can still import files — the preview will use a reduced mode.'
 															: 'This browser is missing some capabilities. Editing still works, just with fewer effects.'))
-													: 'Drag a file here, or click Import'}
+													: studioText().dropHere}
 										</p>
 									</div>
 									<label
@@ -4952,7 +4949,7 @@ export function App() {
 											multiple
 											onChange={handleImportInput}
 											disabled={importBlocked()}
-											aria-label="Import media"
+											aria-label={studioText().import}
 											title={importHint() ?? undefined}
 										/>
 									</label>
@@ -4965,7 +4962,7 @@ export function App() {
 													class="export-why-link"
 													onClick={() => openDocs('getting-started')}
 												>
-													New here? Read the getting started guide
+													{studioText().newHere}
 												</button>
 											}
 										>
@@ -5031,7 +5028,7 @@ export function App() {
 													value={tab.id}
 													class="side-rail-tab"
 												>
-													{tab.label}
+													{sideRailTabLabel(tab.id)}
 												</Tabs.Trigger>
 											)}
 										</For>

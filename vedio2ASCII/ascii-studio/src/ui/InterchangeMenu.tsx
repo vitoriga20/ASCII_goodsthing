@@ -1,3 +1,4 @@
+import { studioCopy, studioLocale } from './locale';
 import { createSignal, For, Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { Popover } from '@ark-ui/solid/popover';
@@ -25,6 +26,7 @@ interface InterchangeMenuProps {
  * download, so the only gate is having a non-empty timeline.
  */
 export function InterchangeMenu(props: InterchangeMenuProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [open, setOpen] = createSignal(false);
 	const [edlTrackId, setEdlTrackId] = createSignal<string | null>(null);
 
@@ -51,7 +53,7 @@ export function InterchangeMenu(props: InterchangeMenuProps) {
 				}
 			>
 				<FileOutput size={14} aria-hidden="true" />
-				Interchange
+				{copy().interchange}
 			</Popover.Trigger>
 			<Portal>
 				<Popover.Positioner>

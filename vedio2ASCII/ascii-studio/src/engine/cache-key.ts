@@ -1,0 +1,387 @@
+import type {
+	ClipDependencyKey,
+	ProxyGenerationSettings,
+	RenderCacheKey,
+	RenderCacheEntry,
+	SourceDependencyKey
+} from './cache-types';
+import type { ExportSettings, SourceDescriptorSnapshot, TimeRemapSnapshot } from '../protocol';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stableNumber(value: number): string {
+	if (Number.isNaN(value)) return '"NaN"';
+	if (value === Number.POSITIVE_INFINITY) return '"Infinity"';
+	if (value === Number.NEGATIVE_INFINITY) return '"-Infinity"';
+	return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+}
+
+function stablePrimitive(value: string | number | boolean | null | undefined): string {
+	if (typeof value === 'number') return stableNumber(value);
+	if (value === undefined) return '"__undefined__"';
+	return JSON.stringify(value);
+}
+
+function rightRotate(value: number, bits: number): number {
+	return (value >>> bits) | (value << (32 - bits));
+}
+
+const SHA256_K = [
+	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+	0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+	0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+	0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+	0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+	0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+	0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+	0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+] as const;
+
+function stableArrayBufferView(value: ArrayBufferView): string {
+	if (value instanceof DataView) {
+		const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+		return stableStringify(Array.from(bytes));
+	}
+	const array = Array.from(value as unknown as Iterable<number>);
+	return stableStringify(array);
+}
+
+export function stableStringify(value: unknown): string {
+	if (
+		value === null ||
+		value === undefined ||
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'boolean'
+	) {
+		return stablePrimitive(value);
+	}
+	if (ArrayBuffer.isView(value)) {
+		return stableArrayBufferView(value);
+	}
+	if (Array.isArray(value)) {
+		return `[${value.map(stableStringify).join(',')}]`;
+	}
+	if (isRecord(value)) {
+		const keys = Object.keys(value).sort();
+		return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+	}
+	return stablePrimitive(JSON.stringify(value));
+}
+
+export function hashString(input: string): string {
+	const bytes = new TextEncoder().encode(input);
+	const bitLength = bytes.length * 8;
+	const paddedLength = Math.ceil((bytes.length + 1 + 8) / 64) * 64;
+	const data = new Uint8Array(paddedLength);
+	data.set(bytes);
+	data[bytes.length] = 0x80;
+	const view = new DataView(data.buffer);
+	view.setUint32(paddedLength - 8, Math.floor(bitLength / 0x1_0000_0000));
+	view.setUint32(paddedLength - 4, bitLength >>> 0);
+
+	let h0 = 0x6a09e667;
+	let h1 = 0xbb67ae85;
+	let h2 = 0x3c6ef372;
+	let h3 = 0xa54ff53a;
+	let h4 = 0x510e527f;
+	let h5 = 0x9b05688c;
+	let h6 = 0x1f83d9ab;
+	let h7 = 0x5be0cd19;
+	const words = new Uint32Array(64);
+
+	for (let offset = 0; offset < paddedLength; offset += 64) {
+		for (let i = 0; i < 16; i += 1) {
+			words[i] = view.getUint32(offset + i * 4);
+		}
+		for (let i = 16; i < 64; i += 1) {
+			const s0 =
+				rightRotate(words[i - 15]!, 7) ^ rightRotate(words[i - 15]!, 18) ^ (words[i - 15]! >>> 3);
+			const s1 =
+				rightRotate(words[i - 2]!, 17) ^ rightRotate(words[i - 2]!, 19) ^ (words[i - 2]! >>> 10);
+			words[i] = (words[i - 16]! + s0 + words[i - 7]! + s1) >>> 0;
+		}
+
+		let a = h0;
+		let b = h1;
+		let c = h2;
+		let d = h3;
+		let e = h4;
+		let f = h5;
+		let g = h6;
+		let h = h7;
+
+		for (let i = 0; i < 64; i += 1) {
+			const s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+			const ch = (e & f) ^ (~e & g);
+			const temp1 = (h + s1 + ch + SHA256_K[i]! + words[i]!) >>> 0;
+			const s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+			const maj = (a & b) ^ (a & c) ^ (b & c);
+			const temp2 = (s0 + maj) >>> 0;
+			h = g;
+			g = f;
+			f = e;
+			e = (d + temp1) >>> 0;
+			d = c;
+			c = b;
+			b = a;
+			a = (temp1 + temp2) >>> 0;
+		}
+
+		h0 = (h0 + a) >>> 0;
+		h1 = (h1 + b) >>> 0;
+		h2 = (h2 + c) >>> 0;
+		h3 = (h3 + d) >>> 0;
+		h4 = (h4 + e) >>> 0;
+		h5 = (h5 + f) >>> 0;
+		h6 = (h6 + g) >>> 0;
+		h7 = (h7 + h) >>> 0;
+	}
+
+	return [h0, h1, h2, h3, h4, h5, h6, h7]
+		.map((value) => value.toString(16).padStart(8, '0'))
+		.join('');
+}
+
+export function hashStableValue(namespace: string, value: unknown): string {
+	return `${namespace}:${hashString(stableStringify(value))}`;
+}
+
+export function sourceFingerprintFromDescriptor(source: SourceDescriptorSnapshot): string {
+	return hashStableValue('source', {
+		contentFingerprint: source.fingerprint,
+		kind: source.kind,
+		fileName: source.fileName,
+		byteSize: source.byteSize,
+		durationS: source.durationS,
+		mimeType: source.mimeType,
+		video: source.video,
+		audio: source.audio,
+		timing: source.timing
+	});
+}
+
+export function sourceConformanceHash(source: SourceDescriptorSnapshot): string {
+	return hashStableValue('conformance', {
+		adapterId: source.adapterId,
+		kind: source.kind,
+		durationS: source.durationS,
+		video: source.video
+			? {
+					frameRateMode: source.video.frameRateMode,
+					rotationDeg: source.video.rotationDeg,
+					trackStartS: source.video.trackStartS,
+					trackDurationS: source.video.trackDurationS,
+					codec: source.video.codec,
+					canDecode: source.video.canDecode
+				}
+			: undefined,
+		audio: source.audio
+			? {
+					channels: source.audio.channels,
+					sampleRate: source.audio.sampleRate,
+					trackStartS: source.audio.trackStartS,
+					trackDurationS: source.audio.trackDurationS,
+					codec: source.audio.codec,
+					canDecode: source.audio.canDecode
+				}
+			: undefined,
+		timing: source.timing,
+		healthStatus: source.health?.status
+	});
+}
+
+export function proxySettingsHash(settings: ProxyGenerationSettings): string {
+	return hashStableValue('proxy-settings', settings);
+}
+
+/**
+ * Phase 35: Compute a deterministic hash of a TimeRemapSnapshot.
+ * Keyframes are sorted by outTimeS before stringifying to ensure determinism.
+ */
+export function hashTimeRemap(remap: TimeRemapSnapshot): string {
+	const canonical = {
+		keyframes: [...remap.keyframes]
+			.sort((a, b) => a.outTimeS - b.outTimeS)
+			.map((kf) => ({
+				outTimeS: kf.outTimeS,
+				speed: kf.speed,
+				easing: kf.easing
+			})),
+		pitchPreserve: remap.pitchPreserve
+	};
+	return hashStableValue('time-remap', canonical);
+}
+
+/**
+ * Phase 35: Build a {@link ClipDependencyKey} from its component hashes.
+ * Routes `timeRemap` through {@link hashTimeRemap} so remap-aware cache
+ * invalidation can key on the resulting `timeRemapHash` field.
+ */
+export function buildClipDependencyKey(input: {
+	trackId: string;
+	clipId: string;
+	sourceId: string;
+	startS: number;
+	durationS: number;
+	inPointS: number;
+	effectsHash: string;
+	transformHash: string;
+	lutHash?: string;
+	titleTextureHash?: string;
+	keyframeHash?: string;
+	audioHash?: string;
+	timeRemap?: TimeRemapSnapshot;
+}): ClipDependencyKey {
+	const key: Mutable<ClipDependencyKey> = {
+		trackId: input.trackId,
+		clipId: input.clipId,
+		sourceId: input.sourceId,
+		startS: input.startS,
+		durationS: input.durationS,
+		inPointS: input.inPointS,
+		effectsHash: input.effectsHash,
+		transformHash: input.transformHash
+	};
+	if (input.lutHash !== undefined) key.lutHash = input.lutHash;
+	if (input.titleTextureHash !== undefined) key.titleTextureHash = input.titleTextureHash;
+	if (input.keyframeHash !== undefined) key.keyframeHash = input.keyframeHash;
+	if (input.audioHash !== undefined) key.audioHash = input.audioHash;
+	if (input.timeRemap) key.timeRemapHash = hashTimeRemap(input.timeRemap);
+	return key;
+}
+
+type Mutable<T> = { -readonly [P in keyof T]: T[P] };
+
+export function canonicalExportSettingsForCache(settings: ExportSettings): ExportSettings {
+	const canonical: ExportSettings = {
+		preset: settings.preset,
+		codec: settings.codec,
+		container: settings.container,
+		width: settings.width,
+		height: settings.height,
+		fps: settings.fps,
+		videoBitrate: settings.videoBitrate
+	};
+	if (settings.range) {
+		canonical.range = {
+			startS: settings.range.startS,
+			endS: settings.range.endS
+		};
+	}
+	if (settings.sourceMode === 'proxy') {
+		canonical.sourceMode = 'proxy';
+	}
+	if (settings.interpolation) {
+		canonical.interpolation = {
+			mode: settings.interpolation.mode,
+			factorCap: settings.interpolation.factorCap,
+			targetFps: settings.interpolation.targetFps,
+			motionBlur: settings.interpolation.motionBlur
+		};
+	}
+	return canonical;
+}
+
+export function exportSettingsHash(settings: ExportSettings): string {
+	return hashStableValue('export-settings', canonicalExportSettingsForCache(settings));
+}
+
+/**
+ * Phase 37: canonical interpolation cache input (R6.1). Changing any field
+ * invalidates affected render-cache ranges.
+ */
+export interface InterpolationCacheInput {
+	readonly mode: 'off' | 'slowmo' | 'fps-upconvert';
+	readonly factorCap: number;
+	readonly targetFps?: number;
+	readonly rampHash?: string;
+	readonly modelId: string;
+	readonly modelVersion: string;
+	readonly tilingProfileHash: string;
+	readonly motionBlur: boolean;
+}
+
+/**
+ * Phase 37: compute the interpolation hash for a render-cache key.
+ * Returns undefined when interpolation is off (canonicalises to no hash,
+ * avoiding avoidable misses).
+ */
+export function interpolationHash(input: InterpolationCacheInput): string | undefined {
+	if (input.mode === 'off') return undefined;
+	return hashStableValue('interpolation', {
+		mode: input.mode,
+		factorCap: input.factorCap,
+		targetFps: input.targetFps ?? null,
+		rampHash: input.rampHash ?? null,
+		modelId: input.modelId,
+		modelVersion: input.modelVersion,
+		tilingProfileHash: input.tilingProfileHash,
+		motionBlur: input.motionBlur
+	});
+}
+
+export function renderCacheKeyHash(key: RenderCacheKey): string {
+	return hashStableValue('render-cache-key', canonicalRenderCacheKey(key));
+}
+
+export function renderCacheKeysEqual(a: RenderCacheKey, b: RenderCacheKey): boolean {
+	return (
+		stableStringify(canonicalRenderCacheKey(a)) === stableStringify(canonicalRenderCacheKey(b))
+	);
+}
+
+export function renderCacheEntryMatchesKey(
+	entry: Pick<RenderCacheEntry, 'keyHash' | 'key'>,
+	requestedKey: RenderCacheKey
+): boolean {
+	return (
+		entry.keyHash === renderCacheKeyHash(requestedKey) &&
+		renderCacheKeysEqual(entry.key, requestedKey)
+	);
+}
+
+function sortStrings(values: readonly string[]): string[] {
+	return values.toSorted();
+}
+
+function sortSources(values: readonly SourceDependencyKey[]): SourceDependencyKey[] {
+	return values.toSorted((a, b) => {
+		const source = a.sourceId.localeCompare(b.sourceId);
+		if (source !== 0) return source;
+		return a.fingerprint.localeCompare(b.fingerprint);
+	});
+}
+
+function sortClips(values: readonly ClipDependencyKey[]): ClipDependencyKey[] {
+	return values.toSorted((a, b) => {
+		const track = a.trackId.localeCompare(b.trackId);
+		if (track !== 0) return track;
+		const start = a.startS - b.startS;
+		if (start !== 0) return start;
+		return a.clipId.localeCompare(b.clipId);
+	});
+}
+
+export function canonicalRenderCacheKey(key: RenderCacheKey): RenderCacheKey {
+	return {
+		...key,
+		timelineRange: {
+			startS: key.timelineRange.startS,
+			endS: key.timelineRange.endS
+		},
+		outputSize: {
+			width: key.outputSize.width,
+			height: key.outputSize.height
+		},
+		sourceFingerprints: sortSources(key.sourceFingerprints),
+		clipDependencies: sortClips(key.clipDependencies),
+		transitionHashes: sortStrings(key.transitionHashes),
+		titleTextureHashes: sortStrings(key.titleTextureHashes),
+		lutHashes: sortStrings(key.lutHashes),
+		keyframeHashes: sortStrings(key.keyframeHashes),
+		interpolationHash: key.interpolationHash
+	};
+}

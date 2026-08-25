@@ -1,0 +1,695 @@
+/** WebGPU compute effect chain — Phase 4, extended in Phase 21 and Phase 38.
+ *
+ *  Phase 21 splits the old `encodeColourChain` into `encodeColourImport` +
+ *  `encodeBaseCorrection` + `encodeLutApply`, so the pipeline orchestrator in
+ *  gpu.ts can interleave normalization, opacity, and output-conversion stages.
+ *
+ *  Phase 38 adds grain, halation, and vignette film-look passes via
+ *  `encodeFilmLooks`, called after the LUT in the fixed pipeline order:
+ *  decode → colour grade → clip LUT → halation → grain → vignette.
+ */
+
+import brightnessContrastF32 from './shaders/brightness-contrast.wgsl?raw';
+import brightnessContrastF16 from './shaders/brightness-contrast.f16.wgsl?raw';
+import saturationF32 from './shaders/saturation.wgsl?raw';
+import saturationF16 from './shaders/saturation.f16.wgsl?raw';
+import colourTemperatureF32 from './shaders/colour-temperature.wgsl?raw';
+import colourTemperatureF16 from './shaders/colour-temperature.f16.wgsl?raw';
+import lutApplyF32 from './shaders/lut-apply.wgsl?raw';
+import lutApplyF16 from './shaders/lut-apply.f16.wgsl?raw';
+import grainF32 from './shaders/grain.wgsl?raw';
+import grainF16 from './shaders/grain.f16.wgsl?raw';
+import halationF32 from './shaders/halation.wgsl?raw';
+import halationF16 from './shaders/halation.f16.wgsl?raw';
+import vignetteF32 from './shaders/vignette.wgsl?raw';
+import vignetteF16 from './shaders/vignette.f16.wgsl?raw';
+import passthroughSource from './shaders/passthrough.wgsl?raw';
+import { createComputePipeline } from './gpu-pipeline';
+import { LutTextureCache, type ClipLut } from './lut';
+
+export type EffectId =
+	| 'brightness-contrast'
+	| 'saturation'
+	| 'colour-temperature'
+	| 'lut-apply'
+	| 'grain'
+	| 'halation'
+	| 'vignette';
+type ScalarEffectId = Exclude<EffectId, 'lut-apply'>;
+
+/** Per-clip colour-grade parameters mirrored in the timeline model. */
+export interface ClipEffectParams {
+	brightness: number;
+	contrast: number;
+	saturation: number;
+	temperature: number;
+	temperatureStrength: number;
+	lutStrength: number;
+	skinSmoothStrength: number;
+	// Film-look params (Phase 38a). All default to neutral (pass skipped at zero).
+	grainStrength: number;
+	grainSize: number;
+	halationThreshold: number;
+	halationRadius: number;
+	halationTintR: number;
+	halationTintG: number;
+	halationTintB: number;
+	vignetteAmount: number;
+	vignetteFeather: number;
+	vignetteRoundness: number;
+}
+
+export const DEFAULT_CLIP_EFFECTS: ClipEffectParams = {
+	brightness: 0,
+	contrast: 1,
+	saturation: 1,
+	temperature: 6500,
+	temperatureStrength: 1,
+	lutStrength: 0,
+	skinSmoothStrength: 0,
+	grainStrength: 0,
+	grainSize: 1.0,
+	halationThreshold: 0.75,
+	halationRadius: 0,
+	halationTintR: 1.0,
+	halationTintG: 0.3,
+	halationTintB: 0.1,
+	vignetteAmount: 0,
+	vignetteFeather: 0.5,
+	vignetteRoundness: 1.0
+};
+
+function clampFinite(v: number | undefined, lo: number, hi: number, fallback: number): number {
+	if (v === undefined || v === null || !Number.isFinite(v)) return fallback;
+	return Math.max(lo, Math.min(hi, v));
+}
+
+export function normalizeClipEffects(
+	partial: Partial<ClipEffectParams> | undefined
+): ClipEffectParams {
+	return {
+		brightness: partial?.brightness ?? DEFAULT_CLIP_EFFECTS.brightness,
+		contrast: partial?.contrast ?? DEFAULT_CLIP_EFFECTS.contrast,
+		saturation: partial?.saturation ?? DEFAULT_CLIP_EFFECTS.saturation,
+		temperature: partial?.temperature ?? DEFAULT_CLIP_EFFECTS.temperature,
+		temperatureStrength: partial?.temperatureStrength ?? DEFAULT_CLIP_EFFECTS.temperatureStrength,
+		lutStrength: partial?.lutStrength ?? DEFAULT_CLIP_EFFECTS.lutStrength,
+		skinSmoothStrength: clampFinite(
+			partial?.skinSmoothStrength,
+			0,
+			1,
+			DEFAULT_CLIP_EFFECTS.skinSmoothStrength
+		),
+		grainStrength: clampFinite(partial?.grainStrength, 0, 1, DEFAULT_CLIP_EFFECTS.grainStrength),
+		grainSize: clampFinite(partial?.grainSize, 0.5, 4.0, DEFAULT_CLIP_EFFECTS.grainSize),
+		halationThreshold: clampFinite(
+			partial?.halationThreshold,
+			0,
+			1,
+			DEFAULT_CLIP_EFFECTS.halationThreshold
+		),
+		halationRadius: clampFinite(
+			partial?.halationRadius,
+			0,
+			64,
+			DEFAULT_CLIP_EFFECTS.halationRadius
+		),
+		halationTintR: clampFinite(partial?.halationTintR, 0, 1, DEFAULT_CLIP_EFFECTS.halationTintR),
+		halationTintG: clampFinite(partial?.halationTintG, 0, 1, DEFAULT_CLIP_EFFECTS.halationTintG),
+		halationTintB: clampFinite(partial?.halationTintB, 0, 1, DEFAULT_CLIP_EFFECTS.halationTintB),
+		vignetteAmount: clampFinite(partial?.vignetteAmount, 0, 1, DEFAULT_CLIP_EFFECTS.vignetteAmount),
+		vignetteFeather: clampFinite(
+			partial?.vignetteFeather,
+			0,
+			1,
+			DEFAULT_CLIP_EFFECTS.vignetteFeather
+		),
+		vignetteRoundness: clampFinite(
+			partial?.vignetteRoundness,
+			0,
+			2,
+			DEFAULT_CLIP_EFFECTS.vignetteRoundness
+		)
+	};
+}
+
+interface UniformField {
+	key: keyof ClipEffectParams;
+	offset: number;
+}
+
+interface EffectRegistryEntry {
+	id: ScalarEffectId;
+	label: string;
+	shaderF32: string;
+	shaderF16: string;
+	uniformByteLength: number;
+	fields: UniformField[];
+}
+
+interface LutRegistryEntry {
+	id: 'lut-apply';
+	label: string;
+	shaderF32: string;
+	shaderF16: string;
+	uniformByteLength: number;
+	fields: UniformField[];
+}
+
+const EFFECT_REGISTRY: EffectRegistryEntry[] = [
+	{
+		id: 'brightness-contrast',
+		label: 'Brightness / Contrast',
+		shaderF32: brightnessContrastF32,
+		shaderF16: brightnessContrastF16,
+		uniformByteLength: 16,
+		fields: [
+			{ key: 'brightness', offset: 0 },
+			{ key: 'contrast', offset: 4 }
+		]
+	},
+	{
+		id: 'saturation',
+		label: 'Saturation',
+		shaderF32: saturationF32,
+		shaderF16: saturationF16,
+		uniformByteLength: 16,
+		fields: [{ key: 'saturation', offset: 0 }]
+	},
+	{
+		id: 'colour-temperature',
+		label: 'Colour Temperature',
+		shaderF32: colourTemperatureF32,
+		shaderF16: colourTemperatureF16,
+		uniformByteLength: 16,
+		fields: [
+			{ key: 'temperature', offset: 0 },
+			{ key: 'temperatureStrength', offset: 4 }
+		]
+	},
+	{
+		id: 'grain',
+		label: 'Grain',
+		shaderF32: grainF32,
+		shaderF16: grainF16,
+		uniformByteLength: 16,
+		fields: [
+			{ key: 'grainStrength', offset: 0 },
+			{ key: 'grainSize', offset: 4 }
+		]
+	},
+	{
+		id: 'halation',
+		label: 'Halation',
+		shaderF32: halationF32,
+		shaderF16: halationF16,
+		uniformByteLength: 32,
+		fields: [
+			{ key: 'halationThreshold', offset: 0 },
+			{ key: 'halationRadius', offset: 4 },
+			{ key: 'halationTintR', offset: 8 },
+			{ key: 'halationTintG', offset: 12 },
+			{ key: 'halationTintB', offset: 16 }
+		]
+	},
+	{
+		id: 'vignette',
+		label: 'Vignette',
+		shaderF32: vignetteF32,
+		shaderF16: vignetteF16,
+		uniformByteLength: 16,
+		fields: [
+			{ key: 'vignetteAmount', offset: 0 },
+			{ key: 'vignetteFeather', offset: 4 },
+			{ key: 'vignetteRoundness', offset: 8 }
+		]
+	}
+];
+
+const LUT_REGISTRY_ENTRY: LutRegistryEntry = {
+	id: 'lut-apply',
+	label: 'LUT',
+	shaderF32: lutApplyF32,
+	shaderF16: lutApplyF16,
+	uniformByteLength: 48,
+	fields: [{ key: 'lutStrength', offset: 0 }]
+};
+
+export const EFFECT_IDS: EffectId[] = [
+	...EFFECT_REGISTRY.map((entry) => entry.id),
+	LUT_REGISTRY_ENTRY.id
+];
+
+export function getEffectLabel(id: EffectId): string {
+	return [...EFFECT_REGISTRY, LUT_REGISTRY_ENTRY].find((entry) => entry.id === id)?.label ?? id;
+}
+
+/** Packs one effect's uniform buffer from clip parameters (testable without GPU). */
+export function isBrightnessContrastActive(params: ClipEffectParams): boolean {
+	return params.brightness !== 0 || params.contrast !== 1;
+}
+
+export function isSaturationActive(params: ClipEffectParams): boolean {
+	return params.saturation !== 1;
+}
+
+/** Strength 0 is an explicit bypass; other effects use their neutral scalar instead. */
+export function isColourTemperatureActive(params: ClipEffectParams): boolean {
+	return (
+		params.temperatureStrength !== 0 && params.temperature !== DEFAULT_CLIP_EFFECTS.temperature
+	);
+}
+
+export function isLutActive(params: ClipEffectParams, lut: ClipLut | undefined): boolean {
+	return Boolean(lut) && params.lutStrength > 0;
+}
+
+export function isGrainActive(params: ClipEffectParams): boolean {
+	return params.grainStrength > 0;
+}
+
+export function isHalationActive(params: ClipEffectParams): boolean {
+	return params.halationRadius > 0;
+}
+
+export function isVignetteActive(params: ClipEffectParams): boolean {
+	return params.vignetteAmount > 0;
+}
+
+export function clipEffectsEqual(a: ClipEffectParams, b: ClipEffectParams): boolean {
+	return (
+		a.brightness === b.brightness &&
+		a.contrast === b.contrast &&
+		a.saturation === b.saturation &&
+		a.temperature === b.temperature &&
+		a.temperatureStrength === b.temperatureStrength &&
+		a.lutStrength === b.lutStrength &&
+		a.skinSmoothStrength === b.skinSmoothStrength &&
+		a.grainStrength === b.grainStrength &&
+		a.grainSize === b.grainSize &&
+		a.halationThreshold === b.halationThreshold &&
+		a.halationRadius === b.halationRadius &&
+		a.halationTintR === b.halationTintR &&
+		a.halationTintG === b.halationTintG &&
+		a.halationTintB === b.halationTintB &&
+		a.vignetteAmount === b.vignetteAmount &&
+		a.vignetteFeather === b.vignetteFeather &&
+		a.vignetteRoundness === b.vignetteRoundness
+	);
+}
+
+export { isSkinSmoothActive } from './skin-smooth';
+
+export function packEffectUniform(effectId: EffectId, params: ClipEffectParams): Float32Array {
+	const entry = [...EFFECT_REGISTRY, LUT_REGISTRY_ENTRY].find((e) => e.id === effectId);
+	if (!entry) throw new Error(`Unknown effect: ${effectId}`);
+	const view = new Float32Array(entry.uniformByteLength / 4);
+	for (const field of entry.fields) {
+		view[field.offset / 4] = params[field.key];
+	}
+	if (effectId === 'lut-apply') {
+		view[8] = 1;
+		view[9] = 1;
+		view[10] = 1;
+	}
+	return view;
+}
+
+export function packLutUniform(params: ClipEffectParams, lut: ClipLut): Float32Array {
+	const view = packEffectUniform('lut-apply', params);
+	view.set(lut.domainMin, 4);
+	view.set(lut.domainMax, 8);
+	return view;
+}
+
+export function packGrainUniform(params: ClipEffectParams, frameTimeSeed: number): Float32Array {
+	const view = packEffectUniform('grain', params);
+	view[2] = frameTimeSeed;
+	return view;
+}
+
+export interface StoragePingPong {
+	a: GPUTextureView;
+	b: GPUTextureView;
+	c: GPUTextureView;
+}
+
+interface CompiledEffect {
+	id: ScalarEffectId;
+	byteLength: number;
+	pipeline: GPUComputePipeline;
+	/** One uniform buffer per concurrent layer slot (grown on demand). A single
+	 *  frame composites many layers in one submission, so each layer needs its
+	 *  own buffer — sharing one would let the last write clobber every pass. */
+	uniformBuffers: GPUBuffer[];
+	bindGroupLayout: GPUBindGroupLayout;
+}
+
+interface CompiledLutEffect {
+	id: 'lut-apply';
+	byteLength: number;
+	pipeline: GPUComputePipeline;
+	uniformBuffers: GPUBuffer[];
+	bindGroupLayout: GPUBindGroupLayout;
+}
+
+/**
+ * Compiles colour-grade pipelines once and encodes the import → grade chain for
+ * one layer into a caller-owned command encoder. Params are supplied per call
+ * (layers in a single frame differ), and each layer slot owns its own uniform
+ * buffers so the multi-layer single submission stays correct.
+ */
+export class EffectChain {
+	private readonly device: GPUDevice;
+	private readonly effects: CompiledEffect[];
+	private readonly lutEffect: CompiledLutEffect;
+	private readonly luts: LutTextureCache;
+	private readonly passthroughPipeline: GPUComputePipeline;
+	private readonly passthroughLayout: GPUBindGroupLayout;
+
+	constructor(device: GPUDevice, useF16: boolean) {
+		this.device = device;
+
+		this.passthroughPipeline = createComputePipeline(device, passthroughSource, 'passthrough');
+		this.passthroughLayout = this.passthroughPipeline.getBindGroupLayout(0);
+
+		this.effects = EFFECT_REGISTRY.map((entry) => {
+			const code = useF16 ? entry.shaderF16 : entry.shaderF32;
+			const pipeline = createComputePipeline(device, code, entry.id);
+			return {
+				id: entry.id,
+				byteLength: entry.uniformByteLength,
+				pipeline,
+				uniformBuffers: [],
+				bindGroupLayout: pipeline.getBindGroupLayout(0)
+			};
+		});
+
+		const lutPipeline = createComputePipeline(
+			device,
+			useF16 ? LUT_REGISTRY_ENTRY.shaderF16 : LUT_REGISTRY_ENTRY.shaderF32,
+			LUT_REGISTRY_ENTRY.id
+		);
+		this.lutEffect = {
+			id: LUT_REGISTRY_ENTRY.id,
+			byteLength: LUT_REGISTRY_ENTRY.uniformByteLength,
+			pipeline: lutPipeline,
+			uniformBuffers: [],
+			bindGroupLayout: lutPipeline.getBindGroupLayout(0)
+		};
+		this.luts = new LutTextureCache(device);
+	}
+
+	private uniformBufferFor(
+		effect: Pick<CompiledEffect, 'byteLength' | 'uniformBuffers'>,
+		slot: number
+	): GPUBuffer {
+		let buffer = effect.uniformBuffers[slot];
+		if (!buffer) {
+			buffer = this.device.createBuffer({
+				size: effect.byteLength,
+				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+			});
+			effect.uniformBuffers[slot] = buffer;
+		}
+		return buffer;
+	}
+
+	importLut(lut: ClipLut): void {
+		this.luts.upsert(lut);
+	}
+
+	pruneLuts(activeKeys: ReadonlySet<string>): void {
+		this.luts.prune(activeKeys);
+	}
+
+	// Public for Phase 21 split pipeline.
+	encodeLut(
+		encoder: GPUCommandEncoder,
+		currentSrc: GPUTextureView,
+		currentDst: GPUTextureView,
+		lut: ClipLut,
+		params: ClipEffectParams,
+		layerSlot: number,
+		wgX: number,
+		wgY: number
+	): GPUTextureView {
+		const lutTexture = this.luts.get(lut.key) ?? this.luts.upsert(lut);
+		const uniformBuffer = this.uniformBufferFor(this.lutEffect, layerSlot);
+		this.device.queue.writeBuffer(uniformBuffer, 0, packLutUniform(params, lut));
+		const bindGroup = this.device.createBindGroup({
+			layout: this.lutEffect.bindGroupLayout,
+			entries: [
+				{ binding: 0, resource: { buffer: uniformBuffer } },
+				{ binding: 1, resource: currentSrc },
+				{ binding: 2, resource: currentDst },
+				{ binding: 3, resource: lutTexture.view },
+				{ binding: 4, resource: lutTexture.sampler }
+			]
+		});
+		const pass = encoder.beginComputePass();
+		pass.setPipeline(this.lutEffect.pipeline);
+		pass.setBindGroup(0, bindGroup);
+		pass.dispatchWorkgroups(wgX, wgY);
+		pass.end();
+		return currentDst;
+	}
+
+	/**
+	 * Stage 0: imports a VideoFrame external texture into storage.a via a passthrough
+	 * compute pass. Returns the storage.a view (ready for downstream stages).
+	 */
+	encodeColourImport(
+		encoder: GPUCommandEncoder,
+		external: GPUExternalTexture,
+		storage: StoragePingPong,
+		width: number,
+		height: number
+	): GPUTextureView {
+		const wgX = Math.ceil(width / 8);
+		const wgY = Math.ceil(height / 8);
+
+		const bindGroup = this.device.createBindGroup({
+			layout: this.passthroughLayout,
+			entries: [
+				{ binding: 0, resource: external },
+				{ binding: 1, resource: storage.a }
+			]
+		});
+		const pass = encoder.beginComputePass();
+		pass.setPipeline(this.passthroughPipeline);
+		pass.setBindGroup(0, bindGroup);
+		pass.dispatchWorkgroups(wgX, wgY);
+		pass.end();
+
+		return storage.a;
+	}
+
+	/**
+	 * Stage 2 (base-correction): encodes brightness → saturation → colour-temperature
+	 * for one layer, reading from `srcView` and returning the last written storage view.
+	 * `slot` selects the per-layer uniform-buffer set for multi-layer frames.
+	 */
+	encodeBaseCorrection(
+		encoder: GPUCommandEncoder,
+		srcView: GPUTextureView,
+		storage: StoragePingPong,
+		width: number,
+		height: number,
+		params: ClipEffectParams,
+		slot = 0
+	): GPUTextureView {
+		const normalized = normalizeClipEffects(params);
+		const wgX = Math.ceil(width / 8);
+		const wgY = Math.ceil(height / 8);
+
+		const activeEffects: CompiledEffect[] = [];
+		if (isBrightnessContrastActive(normalized)) activeEffects.push(this.effects[0]!);
+		if (isSaturationActive(normalized)) activeEffects.push(this.effects[1]!);
+		if (isColourTemperatureActive(normalized)) activeEffects.push(this.effects[2]!);
+
+		if (activeEffects.length === 0) return srcView;
+
+		let currentSrc = srcView;
+		const pingPong = [storage.b, storage.c, storage.a];
+		let bufIdx = 0;
+
+		for (const effect of activeEffects) {
+			const currentDst = pingPong[bufIdx]!;
+			bufIdx = (bufIdx + 1) % 3;
+
+			const uniformBuffer = this.uniformBufferFor(effect, slot);
+			this.device.queue.writeBuffer(uniformBuffer, 0, packEffectUniform(effect.id, normalized));
+
+			const bindGroup = this.device.createBindGroup({
+				layout: effect.bindGroupLayout,
+				entries: [
+					{ binding: 0, resource: { buffer: uniformBuffer } },
+					{ binding: 1, resource: currentSrc },
+					{ binding: 2, resource: currentDst }
+				]
+			});
+			const pass = encoder.beginComputePass();
+			pass.setPipeline(effect.pipeline);
+			pass.setBindGroup(0, bindGroup);
+			pass.dispatchWorkgroups(wgX, wgY);
+			pass.end();
+
+			currentSrc = currentDst;
+		}
+
+		return currentSrc;
+	}
+
+	/**
+	 * Stage 3 (film looks): encodes halation → grain → vignette for one layer.
+	 * Fixed pipeline order (optics-motivated): halation is a lens response that
+	 * occurs before grain is deposited on the emulsion; grain overlays the whole
+	 * frame after chemical processes; vignette is a lens falloff applied last as
+	 * a framing element. All three after the clip LUT. Passes are skipped at
+	 * zero strength — the single queue.submit per frame is never violated.
+	 */
+	encodeFilmLooks(
+		encoder: GPUCommandEncoder,
+		srcView: GPUTextureView,
+		storage: StoragePingPong,
+		width: number,
+		height: number,
+		params: ClipEffectParams,
+		slot: number,
+		frameTimeSeed: number
+	): GPUTextureView {
+		const normalized = normalizeClipEffects(params);
+		if (
+			!isHalationActive(normalized) &&
+			!isGrainActive(normalized) &&
+			!isVignetteActive(normalized)
+		) {
+			return srcView;
+		}
+
+		const wgX = Math.ceil(width / 8);
+		const wgY = Math.ceil(height / 8);
+		const slots = [storage.b, storage.c, storage.a];
+		let currentSrc = srcView;
+		// Start ping-pong from the slot *after* the one currentSrc currently occupies,
+		// so the first dst is never the same view as src (WebGPU forbids a single pass
+		// binding the same texture view as both sampled input and storage output).
+		// External / non-storage srcView (e.g. source-normalize output) falls through
+		// to bufIdx=0 (writes to storage.b) which never collides.
+		const srcSlotIdx =
+			currentSrc === storage.b
+				? 0
+				: currentSrc === storage.c
+					? 1
+					: currentSrc === storage.a
+						? 2
+						: -1;
+		let bufIdx = srcSlotIdx >= 0 ? (srcSlotIdx + 1) % 3 : 0;
+
+		const filmEffects: Array<{ effect: CompiledEffect; pack: () => Float32Array }> = [];
+		if (isHalationActive(normalized)) {
+			const effect = this.effects.find((e) => e.id === 'halation')!;
+			filmEffects.push({ effect, pack: () => packEffectUniform('halation', normalized) });
+		}
+		if (isGrainActive(normalized)) {
+			const effect = this.effects.find((e) => e.id === 'grain')!;
+			filmEffects.push({
+				effect,
+				pack: () => packGrainUniform(normalized, frameTimeSeed)
+			});
+		}
+		if (isVignetteActive(normalized)) {
+			const effect = this.effects.find((e) => e.id === 'vignette')!;
+			filmEffects.push({ effect, pack: () => packEffectUniform('vignette', normalized) });
+		}
+
+		for (const { effect, pack } of filmEffects) {
+			const currentDst = slots[bufIdx]!;
+			bufIdx = (bufIdx + 1) % 3;
+
+			const uniformBuffer = this.uniformBufferFor(effect, slot);
+			this.device.queue.writeBuffer(uniformBuffer, 0, pack());
+
+			const bindGroup = this.device.createBindGroup({
+				layout: effect.bindGroupLayout,
+				entries: [
+					{ binding: 0, resource: { buffer: uniformBuffer } },
+					{ binding: 1, resource: currentSrc },
+					{ binding: 2, resource: currentDst }
+				]
+			});
+			const pass = encoder.beginComputePass();
+			pass.setPipeline(effect.pipeline);
+			pass.setBindGroup(0, bindGroup);
+			pass.dispatchWorkgroups(wgX, wgY);
+			pass.end();
+
+			currentSrc = currentDst;
+		}
+
+		return currentSrc;
+	}
+
+	/**
+	 * Retained for backward compatibility: full colour chain as a single call.
+	 * New callers should use the individual stage methods instead.
+	 */
+	encodeColourChain(
+		encoder: GPUCommandEncoder,
+		external: GPUExternalTexture,
+		storage: StoragePingPong,
+		width: number,
+		height: number,
+		params: ClipEffectParams,
+		layerSlot = 0,
+		lut?: ClipLut
+	): GPUTextureView {
+		const normalized = normalizeClipEffects(params);
+		const wgX = Math.ceil(width / 8);
+		const wgY = Math.ceil(height / 8);
+
+		let currentSrc = this.encodeColourImport(encoder, external, storage, width, height);
+		currentSrc = this.encodeBaseCorrection(
+			encoder,
+			currentSrc,
+			storage,
+			width,
+			height,
+			params,
+			layerSlot
+		);
+
+		if (isLutActive(normalized, lut)) {
+			const activeBaseEffects =
+				(isBrightnessContrastActive(normalized) ? 1 : 0) +
+				(isSaturationActive(normalized) ? 1 : 0) +
+				(isColourTemperatureActive(normalized) ? 1 : 0);
+			const bufIdx = activeBaseEffects % 3;
+			const pingPong = [storage.b, storage.c, storage.a];
+			const currentDst = pingPong[bufIdx]!;
+			currentSrc = this.encodeLut(
+				encoder,
+				currentSrc,
+				currentDst,
+				lut!,
+				normalized,
+				layerSlot,
+				wgX,
+				wgY
+			);
+		}
+
+		return currentSrc;
+	}
+
+	destroy(): void {
+		for (const effect of this.effects) {
+			for (const buffer of effect.uniformBuffers) buffer.destroy();
+			effect.uniformBuffers.length = 0;
+		}
+		for (const buffer of this.lutEffect.uniformBuffers) buffer.destroy();
+		this.lutEffect.uniformBuffers.length = 0;
+		this.luts.destroy();
+	}
+}

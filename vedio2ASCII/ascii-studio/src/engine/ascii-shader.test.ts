@@ -15,4 +15,12 @@ describe('ASCII compute shader contract', () => {
 			'let scaled = clamp((local - vec2f(0.5)) / u.glyphScale + vec2f(0.5), vec2f(0.0), vec2f(1.0));'
 		);
 	});
+	it('maps tone levels to 5x7 ASCII bitmap glyphs instead of filling bright cells', () => {
+		expect(shader).toContain('fn glyphRow(glyph: u32, row: u32) -> u32');
+		expect(shader).toContain(
+			'let pixel = min(vec2u(floor(scaled * vec2f(5.0, 7.0))), vec2u(4u, 6u));'
+		);
+		expect(shader).toContain('let mask = glyphMask(scaled, min(7u, u32(floor(value * 8.0))));');
+		expect(shader).not.toContain('return 1.0;');
+	});
 });

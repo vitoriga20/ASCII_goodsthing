@@ -17,20 +17,24 @@ fn luminance(colour: vec3f) -> f32 {
 	return dot(colour, vec3f(0.2126, 0.7152, 0.0722));
 }
 
-fn glyphMask(local: vec2f, level: f32) -> f32 {
-	let distanceFromCentre = length(local - vec2f(0.5));
-	let horizontal = step(0.44, local.x) * step(local.x, 0.56);
-	let vertical = step(0.44, local.y) * step(local.y, 0.56);
-	let diagonalA = step(abs(local.x - local.y), 0.10);
-	let diagonalB = step(abs((1.0 - local.x) - local.y), 0.10);
-	let ring = step(0.20, distanceFromCentre) * step(distanceFromCentre, 0.38);
-	if (level < 1.0) { return 0.0; }
-	if (level < 2.0) { return horizontal; }
-	if (level < 3.0) { return max(horizontal, vertical); }
-	if (level < 4.0) { return max(max(horizontal, vertical), diagonalA); }
-	if (level < 5.0) { return max(max(horizontal, vertical), max(diagonalA, diagonalB)); }
-	if (level < 6.0) { return max(ring, max(horizontal, vertical)); }
-	return 1.0;
+fn glyphRow(glyph: u32, row: u32) -> u32 {
+	switch (glyph) {
+		case 1u: { let rows = array<u32, 7>(0u, 0u, 0u, 0u, 0u, 0x04u, 0u); return rows[row]; }
+		case 2u: { let rows = array<u32, 7>(0u, 0u, 0x04u, 0u, 0u, 0x04u, 0u); return rows[row]; }
+		case 3u: { let rows = array<u32, 7>(0u, 0x15u, 0x0eu, 0x1fu, 0x0eu, 0x15u, 0u); return rows[row]; }
+		case 4u: { let rows = array<u32, 7>(0u, 0u, 0x04u, 0x1fu, 0x04u, 0u, 0u); return rows[row]; }
+		case 5u: { let rows = array<u32, 7>(0x0au, 0x1fu, 0x0au, 0x1fu, 0x0au, 0u, 0u); return rows[row]; }
+		case 6u: { let rows = array<u32, 7>(0x19u, 0x1au, 0x04u, 0x08u, 0x16u, 0x13u, 0u); return rows[row]; }
+		case 7u: { let rows = array<u32, 7>(0x0eu, 0x11u, 0x17u, 0x15u, 0x17u, 0x10u, 0x0eu); return rows[row]; }
+		default: { return 0u; }
+	}
+}
+
+fn glyphMask(scaled: vec2f, glyph: u32) -> f32 {
+	let pixel = min(vec2u(floor(scaled * vec2f(5.0, 7.0))), vec2u(4u, 6u));
+	let row = glyphRow(glyph, pixel.y);
+	let bit = 4u - pixel.x;
+	return select(0.0, 1.0, (row & (1u << bit)) != 0u);
 }
 
 fn outputColour(source: vec3f, mask: f32) -> vec3f {
@@ -60,6 +64,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 	value = select(value, step(u.threshold, value), u.threshold > 0.0);
 	let local = fract(vec2f(gid.xy) / cellSize);
 	let scaled = clamp((local - vec2f(0.5)) / u.glyphScale + vec2f(0.5), vec2f(0.0), vec2f(1.0));
-	let mask = glyphMask(scaled, floor(value * 7.0));
+	let mask = glyphMask(scaled, min(7u, u32(floor(value * 8.0))));
 	textureStore(dst, gid.xy, vec4f(outputColour(centreColour.rgb, mask), centreColour.a));
 }

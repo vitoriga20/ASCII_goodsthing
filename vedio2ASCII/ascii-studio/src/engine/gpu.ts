@@ -33,6 +33,8 @@ import beautyWarpSource from './shaders/beauty-warp.wgsl?raw';
 import scopesSource from './shaders/scopes.wgsl?raw';
 import vectorscopeSource from './shaders/vectorscope.wgsl?raw';
 import { EffectChain, type ClipEffectParams, isSkinSmoothActive } from './effects';
+import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from './ascii-effect';
+import { AsciiPass } from './ascii-pass';
 import { createComputePipeline } from './gpu-pipeline';
 import type { ClipLut } from './lut';
 import { packSkinBoxUniform, packSkinApplyUniform, radiusForHeight } from './skin-smooth';
@@ -336,6 +338,8 @@ export class PreviewRenderer {
 	private readonly useF16: boolean;
 
 	private readonly effectChain: EffectChain;
+	private readonly asciiPass: AsciiPass;
+	private asciiEffect: AsciiEffectParams = DEFAULT_ASCII_EFFECT;
 	private readonly presentPipeline: GPURenderPipeline;
 	private readonly clearPipeline: GPUComputePipeline;
 	private readonly transformPipeline: GPUComputePipeline;
@@ -376,6 +380,8 @@ export class PreviewRenderer {
 	private accView: [GPUTextureView, GPUTextureView] | null = null;
 	// Phase 21: output-conversion scratch (post-composite, before present).
 	private outConvTex: GPUTexture | null = null;
+	private asciiTex: GPUTexture | null = null;
+	private asciiView: GPUTextureView | null = null;
 	private outConvView: GPUTextureView | null = null;
 	// Phase 21: opacity scratch (dedicated texture to avoid aliasing with storage.c).
 	private opacityTex: GPUTexture | null = null;
@@ -498,6 +504,7 @@ export class PreviewRenderer {
 		this.ownsDevice = options.ownsDevice ?? true;
 		this.useF16 = useF16;
 
+		this.asciiPass = new AsciiPass(device);
 		this.effectChain = new EffectChain(device, useF16);
 
 		const presentModule = device.createShaderModule({ code: presentSource });
@@ -701,6 +708,11 @@ export class PreviewRenderer {
 		return this.lastPresentView;
 	}
 
+	setAsciiEffect(params: AsciiEffectParams): void {
+		this.asciiEffect = params;
+		this.presentBindGroup = null;
+	}
+
 	/** Phase 21: set the SAB used for scope output (written by worker, read by UI). */
 	setScopeSab(sab: SharedArrayBuffer): void {
 		this.scopeSab = new Float32Array(sab);
@@ -794,6 +806,7 @@ export class PreviewRenderer {
 		// Phase 21: output-conversion scratch
 		this.outConvTex = this.device.createTexture({ size, format: 'rgba8unorm', usage });
 		// Phase 21: opacity scratch (dedicated to avoid aliasing)
+		this.asciiTex = this.device.createTexture({ size, format: COMPOSITOR_WORKING_FORMAT, usage });
 		this.opacityTex = this.device.createTexture({
 			size,
 			format: COMPOSITOR_WORKING_FORMAT,
@@ -813,6 +826,7 @@ export class PreviewRenderer {
 
 		this.lastPresentView = null;
 		this.transformViewB = this.transformTexB?.createView() ?? null;
+		this.asciiView = this.asciiTex!.createView();
 		this.presentBindGroup = null;
 	}
 
@@ -1215,7 +1229,11 @@ export class PreviewRenderer {
 
 		this._lastAccView = accView[acc];
 		this._lastAccTex = this.accTex![acc] ?? null;
-		return this.encodeOutputConvert(encoder, accView[acc], wgX, wgY);
+		let programView = accView[acc];
+		if (this.asciiEffect.enabled && this.asciiView) {
+			programView = this.asciiPass.encode(encoder, programView, this.asciiView, this.width, this.height, this.asciiEffect, 0);
+		}
+		return this.encodeOutputConvert(encoder, programView, wgX, wgY);
 	}
 
 	// ── Stage encoders (Phase 21) ──────────────────────────────────────────
@@ -2220,6 +2238,7 @@ export class PreviewRenderer {
 
 	destroy(): void {
 		this.effectChain.destroy();
+		this.asciiPass.destroy();
 		this.destroyTextures();
 		for (const buffer of this.transformBuffers) buffer.destroy();
 		this.transformBuffers.length = 0;
@@ -2291,6 +2310,7 @@ export class PreviewRenderer {
 		this.transformTex?.destroy();
 		this.transformTexB?.destroy();
 		this.outConvTex?.destroy();
+		this.asciiTex?.destroy();
 		this.opacityTex?.destroy();
 		this.zebraTex?.destroy();
 		this.accTex?.[0]?.destroy();
@@ -2303,6 +2323,8 @@ export class PreviewRenderer {
 		this.transformTex = null;
 		this.transformTexB = null;
 		this.outConvTex = null;
+		this.asciiTex = null;
+		this.asciiView = null;
 		this.outConvView = null;
 		this.opacityTex = null;
 		this.opacityView = null;

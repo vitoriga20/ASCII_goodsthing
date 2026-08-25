@@ -9050,6 +9050,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 			break;
 		case 'set-ascii-effect':
 			asciiEffect = normalizeAsciiEffect({ ...asciiEffect, ...cmd.params });
+			renderer?.setAsciiEffect(asciiEffect);
 			break;
 		case 'export-probe':
 			void handleExportProbe();

@@ -1,3 +1,4 @@
+import './ascii-studio.css';
 import { isIsoTimestamp } from '../time';
 import {
 	createEffect,
@@ -78,6 +79,9 @@ import {
 import { createSharedClock } from './clock';
 import { createWorkerBridge } from './worker-bridge';
 import { PreviewCanvas } from './PreviewCanvas';
+import { SourceMonitor } from './SourceMonitor';
+import { AsciiInspector } from './AsciiInspector';
+import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from '../engine/ascii-effect';
 import { PreviewGizmo } from './PreviewGizmo';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { buildUiDiagnosticSnapshot } from './diagnostic-snapshot';
@@ -408,6 +412,8 @@ export function App() {
 	const [exportBackend, setExportBackend] = createSignal<ExportBackend>('none');
 	const [previewReady, setPreviewReady] = createSignal(false);
 	const [exportReady, setExportReady] = createSignal(false);
+	const [asciiEffect, setAsciiEffect] = createSignal<AsciiEffectParams>(DEFAULT_ASCII_EFFECT);
+	const [sourcePreviewUrl, setSourcePreviewUrl] = createSignal<string | null>(null);
 	const [capabilityPanelOpen, setCapabilityPanelOpen] = createSignal(false);
 	// In-app user guide route (/docs[/section]); null means the editor view.
 	const [docsSlug, setDocsSlug] = createSignal<string | null>(
@@ -919,6 +925,7 @@ export function App() {
 	);
 
 	onCleanup(() => clearCoverThumbnail());
+	onCleanup(() => clearSourcePreview());
 	function loadVoiceCleanupWasm(): Promise<ArrayBuffer> {
 		voiceCleanupWasmLoad ??= loadVerifiedVoiceCleanupWasm();
 		return voiceCleanupWasmLoad;
@@ -1890,6 +1897,24 @@ export function App() {
 		const preview = compatibilityPreview();
 		if (preview) preview.revoke();
 		setCompatibilityPreview(null);
+	}
+
+	function clearSourcePreview(): void {
+		setSourcePreviewUrl((current) => {
+			if (current) URL.revokeObjectURL(current);
+			return null;
+		});
+	}
+
+	function setSourcePreview(file: File): void {
+		if (!file.type.startsWith('video/') && !/\.(mp4|mov|webm)$/i.test(file.name)) return;
+		clearSourcePreview();
+		setSourcePreviewUrl(URL.createObjectURL(file));
+	}
+
+	function updateAsciiEffect(params: Partial<AsciiEffectParams>): void {
+		setAsciiEffect((current) => ({ ...current, ...params }));
+		bridge?.send({ type: 'set-ascii-effect', params });
 	}
 
 	// Phase 46: the main thread owns the MediaStream (getDisplayMedia needs a
@@ -3344,6 +3369,7 @@ export function App() {
 	}
 
 	function resetProjectUiState() {
+		clearSourcePreview();
 		setRestoreOffer(null);
 		// Loop is a per-session transport toggle; a fresh project starts off-by-default
 		// to match the worker, which resets loopEnabled in teardownMedia.
@@ -3387,6 +3413,7 @@ export function App() {
 
 	function importMedia(file: File, fileHandle?: FileSystemFileHandle | null) {
 		discardRestoreBeforeImport();
+		setSourcePreview(file);
 		if (previewSurfaceAvailable()) {
 			// The worker queues imports independently, so a batch (multi-file picker
 			// or drop) must not be gated on `importing()` — that would silently drop
@@ -4649,11 +4676,21 @@ export function App() {
 								...previewCanvasBoxStyle()
 							}}
 						>
-							<Show when={previewKey() + 1} keyed>
-								{(_k) => (
-									<PreviewCanvas onOffscreenReady={sendInit} onCanvasEl={setPreviewCanvasEl} />
-								)}
-							</Show>
+							<div class="dual-monitor-grid">
+								<SourceMonitor
+									src={sourcePreviewUrl}
+									currentTime={clock.currentTime}
+									playing={clock.playing}
+								/>
+								<section class="ascii-monitor" aria-label="ASCII program preview">
+									<div class="monitor-label"><span>ASCII PROGRAM</span><span>GPU</span></div>
+									<Show when={previewKey() + 1} keyed>
+										{(_k) => (
+											<PreviewCanvas onOffscreenReady={sendInit} onCanvasEl={setPreviewCanvasEl} />
+										)}
+									</Show>
+								</section>
+							</div>
 							<Show when={previewSurfaceAvailable() && selectedClipTransform() && previewSize()}>
 								<PreviewGizmo
 									transform={selectedClipTransform()!.transform}
@@ -5005,7 +5042,8 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('inspector')}
 										>
-											<Inspector
+											<AsciiInspector value={asciiEffect} onChange={updateAsciiEffect} />
+										<Inspector
 												metadata={metadata()}
 												selectedClip={selectedClip()}
 												selectedTrackMix={selectedTrackMix()}

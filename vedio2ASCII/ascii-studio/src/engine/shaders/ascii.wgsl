@@ -59,7 +59,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 	if (u.invert > 0.5) { value = 1.0 - value; }
 	value = select(value, step(u.threshold, value), u.threshold > 0.0);
 	let local = fract(vec2f(gid.xy) / cellSize);
-	let scaled = clamp((local - vec2f(0.5)) / u.glyphScale + vec2f(0.5), 0.0, 1.0);
+	let scaled = clamp((local - vec2f(0.5)) / u.glyphScale + vec2f(0.5), vec2f(0.0), vec2f(1.0));
 	let mask = glyphMask(scaled, floor(value * 7.0));
 	textureStore(dst, gid.xy, vec4f(outputColour(centreColour.rgb, mask), centreColour.a));
 }

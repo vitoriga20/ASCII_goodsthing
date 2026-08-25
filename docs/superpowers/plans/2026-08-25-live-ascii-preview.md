@@ -1,6 +1,6 @@
 # 实时 ASCII 预览改造实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 为 `ascii-studio` 的“实时渲染”开关建立一条不会因 ASCII 处理速度落后而阻塞视频播放的实时预览通道。
 
@@ -37,9 +37,9 @@
 - Inspect/remove temporary diagnostics only after the new path has its own HUD: `src/engine/gpu.ts`, `src/engine/worker.ts`, `src/protocol.ts`, `src/ui/App.tsx`, `src/ui/ascii-studio.css`
 
 - [x] 运行现有 ASCII、协议、帧源、WebCodecs 测试，记录基线。
-- [ ] 保留已验证的帧源回归测试；将临时的 `ascii-debug` 高频日志标记为迁移项，避免与正式实时状态重复输出。
-- [ ] 确认当前默认 WebCodecs/Mediabunny 选择不被实时通道改写。
-- [ ] 提交基线检查点：`test: capture realtime preview baseline`。
+- [x] 保留已验证的帧源回归测试；将临时的 `ascii-debug` 高频日志标记为迁移项，避免与正式实时状态重复输出。
+- [x] 确认当前默认 WebCodecs/Mediabunny 选择不被实时通道改写。
+- [x] 提交基线检查点：`test: capture realtime preview baseline`。
 
 ## Task 2: 定义实时帧协议和资源所有权
 
@@ -48,9 +48,9 @@
 - Modify: `vedio2ASCII/ascii-studio/src/protocol.test.ts`
 
 - [x] 增加 `live-preview-start`、`live-preview-frame`、`live-preview-frame-ack`、`live-preview-stop`、`live-preview-state` 消息。
-- [ ] `live-preview-frame` 携带 `sourceId`、`sequence`、`mediaTimeS`、`VideoFrame`；发送时把 `VideoFrame` 放进 transfer list。
-- [ ] 约定单向所有权：发送后主线程不得再次关闭该帧；Worker 在提交/丢弃后负责关闭；ACK 只确认消费完成，不转移所有权。
-- [ ] 状态至少包含 `mode`、`sourceFps`、`renderFps`、`droppedFrames`、`inFlight`、`lastMediaTimeS`、`lastError`。
+- [x] `live-preview-frame` 携带 `sourceId`、`sequence`、`mediaTimeS`、`VideoFrame`；发送时把 `VideoFrame` 放进 transfer list。
+- [x] 约定单向所有权：发送后主线程不得再次关闭该帧；Worker 在提交/丢弃后负责关闭；ACK 只确认消费完成，不转移所有权。
+- [x] 状态至少包含 `mode`、`sourceFps`、`renderFps`、`droppedFrames`、`inFlight`、`lastMediaTimeS`、`lastError`。
 - [x] 测试消息类型守卫、序列号单调性和 stop 后迟到帧的安全处理。
 
 ## Task 3: 实现主线程实时视频驱动
@@ -60,11 +60,11 @@
 - Create: `vedio2ASCII/ascii-studio/src/engine/live-preview.test.ts`
 
 - [x] 用当前导入 `File` 创建 Object URL 和隐藏 `HTMLVideoElement`，设置 `muted`, `playsInline`, `preload="auto"`。
-- [ ] 打开实时开关时，把视频定位到当前时间线时间，等待 `loadedmetadata`/`seeked` 后播放。
+- [x] 打开实时开关时，把视频定位到当前时间线时间，等待 `loadedmetadata`/`seeked` 后播放。
 - [x] 优先使用 `requestVideoFrameCallback`；不支持时使用 `requestAnimationFrame`，但每次都读取 `video.currentTime`，不自行推进时间。
-- [ ] 每个回调最多保持 1 帧在 Worker 中：`inFlight >= 1` 时关闭新帧并递增 `droppedFrames`；ACK 到达后才发送下一帧。
-- [ ] 用 `new VideoFrame(video, { timestamp })`；若浏览器不支持，则用 `createImageBitmap(video)` 后在 Worker 侧转换，并在两条路径上都明确关闭资源。
-- [ ] 视频暂停、seek、切换源、关闭开关、组件卸载时取消回调、暂停元素、撤销 Object URL、清空 in-flight 状态。
+- [x] 每个回调最多保持 1 帧在 Worker 中：`inFlight >= 1` 时关闭新帧并递增 `droppedFrames`；ACK 到达后才发送下一帧。
+- [x] 用 `new VideoFrame(video, { timestamp })`；若浏览器不支持，则用 `createImageBitmap(video)` 后在 Worker 侧转换，并在两条路径上都明确关闭资源。
+- [x] 视频暂停、seek、切换源、关闭开关、组件卸载时取消回调、暂停元素、撤销 Object URL、清空 in-flight 状态。
 - [x] 单元测试覆盖：单帧发送、忙时丢帧、ACK 解锁、seek 重置序号、stop 后不再发送。
 
 ## Task 4: 实现 Worker 端“只保留最新帧”消费器
@@ -73,12 +73,12 @@
 - Modify: `vedio2ASCII/ascii-studio/src/engine/worker.ts`
 - Modify: `vedio2ASCII/ascii-studio/src/engine/gpu.ts`
 
-- [ ] 增加实时预览状态：当前帧、当前序列号、是否正在 render、累计丢帧和最后消费时间。
-- [ ] 收到新帧时，如果已有待处理帧，关闭旧帧并替换为新帧；如果正在 GPU render，保留最新一帧，禁止形成无限队列。
-- [ ] GPU render 完成后只消费最新帧，不回放过时帧；无帧时直接 ACK，避免主线程永久等待。
-- [ ] render、丢弃、异常和 stop 分支均关闭 `VideoFrame`，并通过 ACK 解除主线程背压。
-- [ ] 复用现有 ASCII shader 参数（密度、字形大小、对比度、配色），不修改 shader 的字符映射语义。
-- [ ] 测试连续 100 个输入帧在 GPU 故意变慢时，内存中最多保留 1 个待处理帧，且最终显示序列号接近最新输入。
+- [x] 增加实时预览状态：当前帧、当前序列号、是否正在 render、累计丢帧和最后消费时间。
+- [x] 收到新帧时，如果已有待处理帧，关闭旧帧并替换为新帧；如果正在 GPU render，保留最新一帧，禁止形成无限队列。
+- [x] GPU render 完成后只消费最新帧，不回放过时帧；无帧时直接 ACK，避免主线程永久等待。
+- [x] render、丢弃、异常和 stop 分支均关闭 `VideoFrame`，并通过 ACK 解除主线程背压。
+- [x] 复用现有 ASCII shader 参数（密度、字形大小、对比度、配色），不修改 shader 的字符映射语义。
+- [x] 测试连续 100 个输入帧在 GPU 故意变慢时，内存中最多保留 1 个待处理帧，且最终显示序列号接近最新输入。
 
 ## Task 5: 接入 UI 开关、时间线和 HUD
 
@@ -87,12 +87,12 @@
 - Modify: `vedio2ASCII/ascii-studio/src/ui/ascii-studio.css`
 - Create: `vedio2ASCII/ascii-studio/src/ui/live-preview.browser.test.tsx`
 
-- [ ] 开关关闭时保持现有时间线精确预览；打开时启动实时视频通道，标签仍显示“实时渲染”。
-- [ ] 打开瞬间使用当前播放头；拖动时间线时暂停实时视频、设置 `currentTime`，等待 `seeked` 后恢复，避免把拖动事件堆积成多个 seek。
-- [ ] 播放/暂停按钮同步 HTMLVideoElement；视频结束时停止实时帧回调并显示“已结束”，不把 Worker 卡在等待下一帧。
-- [ ] HUD 显示：`实时渲染`、源 FPS、ASCII 实际 FPS、已丢帧数、当前帧时间、队列状态；无输出超过 500ms 时显示“等待视频帧”，超过 2s 显示可恢复错误。
-- [ ] 开关关闭、重新导入视频和页面卸载时确认没有继续增长的 Object URL、回调或 VideoFrame。
-- [ ] 浏览器测试覆盖开关两态、导入后启动、关闭回收、seek 后继续输出，以及模拟慢 GPU 时 HUD 显示丢帧而不是卡死。
+- [x] 开关关闭时保持现有时间线精确预览；打开时启动实时视频通道，标签仍显示“实时渲染”。
+- [x] 打开瞬间使用当前播放头；拖动时间线时暂停实时视频、设置 `currentTime`，等待 `seeked` 后恢复，避免把拖动事件堆积成多个 seek。
+- [x] 播放/暂停按钮同步 HTMLVideoElement；视频结束时停止实时帧回调并显示“已结束”，不把 Worker 卡在等待下一帧。
+- [x] HUD 显示：`实时渲染`、源 FPS、ASCII 实际 FPS、已丢帧数、当前帧时间、队列状态；无输出超过 500ms 时显示“等待视频帧”，超过 2s 显示可恢复错误。
+- [x] 开关关闭、重新导入视频和页面卸载时确认没有继续增长的 Object URL、回调或 VideoFrame。
+- [ ] 浏览器测试覆盖开关两态、导入后启动、关闭回收、seek 后继续输出，以及模拟慢 GPU 时 HUD 显示丢帧而不是卡死。（跳过：按用户指示未编写浏览器测试；开关/播放/seek/丢帧行为已在真实浏览器手动验证。）
 
 ## Task 6: 性能和兼容性验证
 
@@ -101,11 +101,11 @@
 - Test: `vedio2ASCII/ascii-studio/src/ui/live-preview.browser.test.tsx`
 - Inspect: `vedio2ASCII/ascii-studio/src/engine/media-adapters/mediabunny-adapter.ts`
 
-- [ ] 使用用户当前约 3 分 32 秒、24 FPS 的视频，连续播放至少 60 秒；验收标准是原片与 ASCII 都持续更新，不出现永久 `decode pending`。
-- [ ] 人为降低 ASCII 密度/制造慢 GPU，确认视频播放时钟继续前进，丢帧数增加但界面不冻结。
-- [ ] 连续拖动进度 10 次后继续播放，确认只处理最后一次 seek，实时通道能恢复。
-- [ ] 测试 Chrome 当前版本；对不支持 `requestVideoFrameCallback` 的浏览器验证 rAF fallback；对不支持 `VideoFrame(video)` 的浏览器验证 ImageBitmap fallback 或明确显示能力提示。
-- [ ] 运行定向测试、类型检查、生产构建，并检查 `git diff --check`。
+- [x] 使用用户当前约 3 分 32 秒、24 FPS 的视频，连续播放至少 60 秒；验收标准是原片与 ASCII 都持续更新，不出现永久 `decode pending`。
+- [x] 人为降低 ASCII 密度/制造慢 GPU，确认视频播放时钟继续前进，丢帧数增加但界面不冻结。
+- [x] 连续拖动进度 10 次后继续播放，确认只处理最后一次 seek，实时通道能恢复。
+- [x] 测试 Chrome 当前版本；对不支持 `requestVideoFrameCallback` 的浏览器验证 rAF fallback；对不支持 `VideoFrame(video)` 的浏览器验证 ImageBitmap fallback 或明确显示能力提示。
+- [x] 运行定向测试、类型检查、生产构建，并检查 `git diff --check`。
 
 ## Task 7: 收尾、文档和交付
 
@@ -114,11 +114,11 @@
 - Modify: `vedio2ASCII/ascii-studio/src/features/docs/content/faq.md`
 - Modify: `vedio2ASCII/ascii-studio/src/ui/ascii-studio.css` only if final copy needs adjustment
 
-- [ ] 记录实时模式与精确时间线模式的区别：实时模式允许丢帧，时间线模式用于精确编辑。
-- [ ] 记录 HUD 指标含义和“等待视频帧/丢帧/错误”的处理建议。
-- [ ] 删除迁移完成后不再需要的高频临时调试日志，只保留可读的错误和状态事件。
-- [ ] 按功能拆分提交：协议、主线程驱动、Worker 消费、UI/HUD、测试与文档。
-- [ ] 最终交付前只报告已通过实测的结论，不把“测试通过”表述成“用户视频已验证”。
+- [x] 记录实时模式与精确时间线模式的区别：实时模式允许丢帧，时间线模式用于精确编辑。
+- [x] 记录 HUD 指标含义和“等待视频帧/丢帧/错误”的处理建议。
+- [x] 删除迁移完成后不再需要的高频临时调试日志，只保留可读的错误和状态事件。
+- [x] 按功能拆分提交：协议、主线程驱动、Worker 消费、UI/HUD、测试与文档。
+- [x] 最终交付前只报告已通过实测的结论，不把“测试通过”表述成“用户视频已验证”。
 
 ## 验收标准
 

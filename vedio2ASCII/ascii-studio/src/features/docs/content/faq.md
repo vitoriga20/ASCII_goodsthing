@@ -39,3 +39,11 @@ Yes — use **Export Bundle** to package the project file and all media into one
 ## Why did my project open with "offline" media?
 
 The project references files by location; if a file moved or the browser lost permission, it shows as offline. Click **Re-link** and pick the file again. See [Troubleshooting](/docs/troubleshooting).
+
+## Why does the ASCII preview drop frames?
+
+The **实时渲染** switch runs a separate realtime channel that prioritizes the playback clock: when ASCII conversion can't keep up, stale frames are discarded instead of piling up and freezing the video. The HUD at the bottom-right of the ASCII monitor shows source FPS, rendered FPS, and the dropped-frame count. That path is for preview only — timeline editing uses the exact-frame path, and exports are never affected.
+
+## The ASCII monitor says "等待视频帧"
+
+The realtime channel is on but hasn't rendered a frame for 500ms — usually because the video is paused or mid-seek. Press play or drag the playhead; if it persists, toggle 实时渲染 off and on again.

@@ -27,6 +27,14 @@ LocalCut Studio is built to keep editing responsive: decoding, effects, and enco
 - Bitrate and resolution scale encode time roughly linearly — export at delivery resolution, not above it.
 - Keep the tab **focused or visible** during long exports; browsers may throttle background tabs.
 
+## Realtime ASCII preview
+
+The **实时渲染** switch (ASCII inspector in the right rail) opens a separate realtime channel: a hidden video element decodes at the browser's native pace, and frames stream to the GPU worker through a bounded, droppable queue.
+
+- **The video clock always wins.** If ASCII conversion falls behind, stale frames are dropped instead of piling up — playback never stalls behind the converter. The timeline's precise editing path (exact seek, step-frame) is untouched and stays active while the switch is off.
+- **The HUD** (bottom-right of the ASCII monitor) shows source FPS, rendered ASCII FPS, and the dropped-frame count. Rendered FPS below source FPS means the GPU is the bottleneck; lowering density or glyph size brings it back up.
+- If the monitor shows **等待视频帧**, the realtime channel is armed but no frame has rendered for 500ms — usually the video is paused or mid-seek. Toggle 实时渲染 off and on again if it persists.
+
 ## Watching the numbers
 
 The **Diagnostics** panel (status-bar button) shows live performance budgets — decode queue depth, dropped frames, cache pressure, storage quota — plus recent errors with recovery actions. If a budget is consistently red on the Accelerated tier, the bottleneck is usually the source media or the GPU; the entries above tell you which lever to pull.

@@ -1,1 +1,6 @@
 .worktrees/
+artifacts/
+.superpowers/
+**/.codegraph/
+参考/
+音视频/

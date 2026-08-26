@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BIOMORPH // CRT diagnostic</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --phosphor: #9dffad;
+      --bright: #e8ffe8;
+      --dim: #4bbb66;
+      --ink: #010703;
+      --screen: #041509;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      display: grid;
+      place-items: center;
+      padding: clamp(14px, 4vw, 40px);
+      color: var(--phosphor);
+      background:
+        radial-gradient(ellipse at 50% 45%, #123a1c 0%, #07180d 27%, #020704 70%),
+        var(--ink);
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    .terminal {
+      position: relative;
+      width: min(100%, 860px);
+      min-height: min(720px, calc(100vh - 28px));
+      overflow: hidden;
+      isolation: isolate;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(18px, 5vh, 52px);
+      padding: clamp(18px, 4vw, 44px);
+      border: 1px solid #2b9b48;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(9, 44, 20, .78), rgba(0, 8, 3, .96));
+      box-shadow: 0 0 0 1px rgba(135, 255, 153, .08) inset, 0 0 24px rgba(49, 255, 94, .23), 0 0 90px rgba(28, 168, 58, .13);
+    }
+
+    .terminal::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      opacity: .72;
+      background: radial-gradient(ellipse at center, transparent 37%, rgba(0, 0, 0, .52) 100%);
+      pointer-events: none;
+    }
+
+    .scanlines,
+    .scanlines::after {
+      position: absolute;
+      pointer-events: none;
+      inset: 0;
+    }
+
+    .scanlines {
+      z-index: 4;
+      opacity: .26;
+      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .08) 0 1px, rgba(154, 255, 170, .045) 1px 3px, rgba(0, 0, 0, .28) 3px 5px);
+      mix-blend-mode: screen;
+    }
+
+    .scanlines::after {
+      content: "";
+      height: 14%;
+      opacity: .42;
+      background: linear-gradient(transparent, rgba(153, 255, 169, .14), transparent);
+      animation: scan 7s linear infinite;
+    }
+
+    .hud,
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: clamp(.61rem, 1.7vw, .78rem);
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .hud { color: #b9ffc2; }
+
+    .badge {
+      color: #1d351f;
+      padding: .32em .55em;
+      background: var(--phosphor);
+      box-shadow: 0 0 10px var(--phosphor);
+      font-weight: bold;
+    }
+
+    .status { text-align: right; }
+
+    .face-stage {
+      align-self: center;
+      display: grid;
+      place-items: center;
+      width: 100%;
+    }
+
+    .face {
+      max-width: 100%;
+      margin: 0;
+      overflow: visible;
+      color: var(--bright);
+      font-size: clamp(7px, 2.2vw, 16px);
+      font-weight: bold;
+      line-height: 1.04;
+      letter-spacing: 0;
+      text-align: center;
+      white-space: pre;
+      text-shadow: 0 0 4px var(--phosphor), 0 0 14px rgba(91, 255, 109, .86), 0 0 27px rgba(91, 255, 109, .42);
+      filter: contrast(1.07);
+      animation: signal-drift 4.8s steps(2, end) infinite;
+      user-select: none;
+    }
+
+    .footer { color: var(--dim); }
+
+    button {
+      position: relative;
+      z-index: 5;
+      appearance: none;
+      border: 1px solid currentColor;
+      border-radius: 0;
+      padding: .68em .88em;
+      color: var(--bright);
+      background: rgba(2, 24, 8, .72);
+      box-shadow: 0 0 10px rgba(93, 255, 113, .16) inset;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(116, 255, 130, .14); }
+    button:focus-visible { outline: 2px solid var(--bright); outline-offset: 4px; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body[data-mode="sleep"] {
+      --phosphor: #4e8f57;
+      --bright: #a6d5a8;
+      --dim: #86c98e;
+      --screen: #071009;
+    }
+
+    body[data-mode="sleep"] .terminal { box-shadow: 0 0 16px rgba(41, 121, 53, .13), 0 0 0 1px rgba(135, 255, 153, .04) inset; }
+    body[data-mode="sleep"] .badge { color: #e7f8e8; background: #285030; box-shadow: none; }
+    body[data-mode="sleep"] .face { opacity: .45; transform: scaleY(.84); text-shadow: 0 0 4px rgba(95, 220, 106, .36); animation-duration: 11s; }
+    body[data-mode="sleep"] .scanlines { opacity: .42; }
+
+    @keyframes scan {
+      from { transform: translateY(-120%); }
+      to { transform: translateY(760%); }
+    }
+
+    @keyframes signal-drift {
+      0%, 100% { transform: translate(0, 0); opacity: 1; }
+      18% { transform: translate(.4px, 0); }
+      19% { transform: translate(-1px, .2px); opacity: .78; }
+      21% { transform: translate(0, 0); opacity: 1; }
+      64% { transform: translate(0, 0); }
+      65% { transform: translate(1px, 0); opacity: .83; }
+      67% { transform: translate(0, 0); opacity: 1; }
+    }
+
+    @media (max-width: 430px) {
+      body { padding: 10px; }
+      .terminal { padding: 16px 12px; border-radius: 12px; }
+      .face { font-size: clamp(5.5px, 1.9vw, 8px); }
+      .footer { align-items: flex-start; flex-direction: column; }
+      button { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body data-mode="diagnostic">
+  <main class="terminal" aria-labelledby="screen-title">
+    <div class="scanlines" aria-hidden="true"></div>
+    <header class="hud">
+      <span class="badge">LIVE</span>
+      <span id="screen-title">BIOMORPH // 16.0.4</span>
+      <span class="status" id="status" aria-live="polite">mode: diagnostic</span>
+    </header>
+
+    <section class="face-stage" aria-label="ASCII biomechanical face diagnostic display">
+      <pre class="face" id="face" aria-hidden="true">
+                 .-=================-.
+           .----/:::::|:::|:::::\\----.
+        .:++:|:/\\::::|:::|::::/\\:|:++:.
+       /:o:|/  \\:::/\\___/\\:::/  \\:|:o:\\
+      |::::|  .-\\_//  ^  \\_/- .|::::|
+      |:[]:|  | /==\\ /_\\ /==\\ |:[]:|
+      |::::|  | |()| |:::| |()| |::::|
+      |:++:|   \\==/|:|_|:|\\==/  |:++:|
+       \\:::\\    /::|:| |:|::\\    /:::/
+        ':++:--==<:::|:|_|:|:::>==--:++:'
+           '----\\___|:___:|___/----'
+                 `---/_____|---`
+                    /_/   \_\\
+      </pre>
+    </section>
+
+    <footer class="footer">
+      <span>neural.bus/active :: frame 0029</span>
+      <button type="button" id="mode-toggle" aria-describedby="mode-help">enter sleep mode</button>
+      <span id="mode-help" class="sr-only">Activate to switch the display between diagnostic and sleep modes.</span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const button = document.getElementById('mode-toggle');
+      const status = document.getElementById('status');
+      const badge = document.querySelector('.badge');
+      const face = document.getElementById('face');
+      const diagnosticFace = face.textContent;
+      const sleepFace = diagnosticFace.replace(/[=#]/g, '.').replace(/[+*]/g, ':');
+
+      function setMode(mode) {
+        document.body.dataset.mode = mode;
+        const isSleeping = mode === 'sleep';
+        status.textContent = `mode: ${mode}`;
+        badge.textContent = isSleeping ? 'IDLE' : 'LIVE';
+        button.textContent = isSleeping ? 'resume diagnostic' : 'enter sleep mode';
+        face.textContent = isSleeping ? sleepFace : diagnosticFace;
+      }
+
+      button.addEventListener('click', () => {
+        setMode(document.body.dataset.mode === 'diagnostic' ? 'sleep' : 'diagnostic');
+      });
+
+      button.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.dataset.mode === 'sleep') {
+          setMode('diagnostic');
+          button.focus();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive ASCII risograph zine cover.">
+  <title>OFFSET / 017</title>
+  <style>
+    :root {
+      --paper: #eadfbd;
+      --ink: #171611;
+      --red: #dc2d2d;
+      --blue: #2357b7;
+      --shift-x: 0px;
+      --shift-y: 0px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: #cfc39f; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 28%, rgb(45 30 10 / .1) 0 1px, transparent 1.4px) 0 0 / 7px 7px,
+        radial-gradient(circle at 80% 68%, rgb(255 250 220 / .6) 0 .7px, transparent 1.1px) 0 0 / 5px 5px,
+        var(--paper);
+      font-family: "Courier New", Courier, monospace;
+    }
+
+    body[data-noise="low"] { background-size: 13px 13px, 10px 10px, auto; }
+    body[data-noise="high"] { background-size: 4px 4px, 3px 3px, auto; }
+
+    .zine {
+      width: min(100%, 1160px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: clamp(18px, 4vw, 54px);
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(18px, 4vw, 48px);
+      background:
+        linear-gradient(90deg, transparent 0 49.65%, rgb(46 33 19 / .1) 49.8% 50.05%, transparent 50.2%),
+        repeating-linear-gradient(0deg, transparent 0 4px, rgb(81 50 22 / .045) 4px 5px);
+      box-shadow: 0 0 60px rgb(51 34 13 / .19);
+    }
+
+    .masthead, .issue-line, .footer, .caption { text-transform: uppercase; letter-spacing: .08em; }
+
+    .masthead {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      border-top: 3px solid var(--ink);
+      padding-top: 8px;
+      font-size: clamp(.63rem, 1.4vw, .83rem);
+      font-weight: bold;
+    }
+
+    .wordmark { font-size: clamp(1.35rem, 4vw, 3.2rem); line-height: .8; letter-spacing: -.14em; }
+    .masthead p { margin: 0; text-align: right; max-width: 29ch; }
+
+    .centerpiece {
+      display: grid;
+      grid-template-columns: minmax(0, .85fr) minmax(210px, 1.45fr) minmax(0, .85fr);
+      align-items: center;
+      gap: clamp(10px, 2vw, 30px);
+    }
+
+    .side-note {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-size: clamp(.62rem, 1.25vw, .76rem);
+      line-height: 1.25;
+      border-left: 1px solid var(--ink);
+      padding-left: 8px;
+    }
+    .side-note p { margin: 0; }
+    .side-note strong { font-size: 1.4em; }
+
+    .portrait {
+      width: 100%;
+      aspect-ratio: 10 / 13;
+      max-height: 68vh;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid var(--ink);
+      background:
+        radial-gradient(circle at 51% 41%, #f3e9c9 0 20%, transparent 20.2%),
+        repeating-radial-gradient(circle at 48% 45%, rgb(23 22 17 / .12) 0 1px, transparent 1px 6px),
+        #d6c9a5;
+      box-shadow: 6px 7px 0 var(--ink);
+      cursor: crosshair;
+      touch-action: none;
+      overscroll-behavior: contain;
+    }
+    .portrait::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      opacity: .22;
+      background: repeating-linear-gradient(0deg, transparent 0 2px, rgb(23 22 17 / .5) 3px 4px);
+      mix-blend-mode: multiply;
+    }
+
+    .ink {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      margin: 0;
+      width: max-content;
+      transform: translate(-50%, -50%);
+      white-space: pre;
+      font: 700 clamp(.31rem, 1.18vw, .66rem) / .78 "Courier New", monospace;
+      letter-spacing: -.08em;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ink-black { color: var(--ink); z-index: 3; }
+    .ink-blue {
+      color: var(--blue);
+      z-index: 2;
+      opacity: .84;
+      transform: translate(calc(-50% + var(--shift-x)), calc(-50% + var(--shift-y)));
+    }
+    .ink-red {
+      color: var(--red);
+      z-index: 1;
+      opacity: .8;
+      transform: translate(calc(-50% - var(--shift-x)), calc(-50% - var(--shift-y)));
+    }
+
+    .caption {
+      margin: 12px 0 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: clamp(.56rem, 1vw, .7rem);
+      font-weight: bold;
+    }
+
+    .footer {
+      border-bottom: 3px solid var(--ink);
+      padding-bottom: 8px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: end;
+      gap: 10px;
+      font-size: clamp(.58rem, 1.2vw, .78rem);
+    }
+    .footer p { margin: 0; }
+    .footer p:last-child { text-align: right; }
+
+    button {
+      appearance: none;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      padding: 6px 8px;
+      font: inherit;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      cursor: pointer;
+    }
+    button:hover, button:focus-visible { color: var(--paper); background: var(--ink); outline: 2px solid var(--red); outline-offset: 3px; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 620px) {
+      .zine { min-height: 100svh; }
+      .centerpiece { grid-template-columns: 1fr; }
+      .side-note { min-height: auto; flex-direction: row; gap: 12px; border-left: 0; border-top: 1px solid var(--ink); padding: 7px 0 0; }
+      .side-note:first-child { order: 2; }
+      .side-note:last-child { order: 3; }
+      .portrait-wrap { order: 1; width: min(100%, 380px); justify-self: center; }
+      .footer { grid-template-columns: 1fr auto; }
+      .footer p:last-child { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+      .ink-blue, .ink-red { transform: translate(-50%, -50%); }
+    }
+  </style>
+</head>
+<body data-noise="low">
+  <main class="zine" aria-label="Offset 017 interactive zine cover">
+    <header class="masthead">
+      <div class="wordmark" aria-label="Offset">OFF/SET</div>
+      <p>Independent printed matter<br>issue 017 / no apology</p>
+    </header>
+
+    <section class="centerpiece" aria-label="The cover portrait">
+      <aside class="side-note" aria-label="Issue notes">
+        <p><strong>Field copy</strong><br>Pressed in three restless inks. Drag a finger across the face; the registration refuses to settle.</p>
+        <p>012<br>NO MORE<br>SMOOTH EDGES</p>
+      </aside>
+
+      <div class="portrait-wrap">
+        <div class="portrait" role="application" tabindex="0" aria-label="Interactive ASCII portrait" aria-describedby="portrait-instructions">
+          <span id="portrait-instructions" class="sr-only">Move your pointer or finger over the portrait to shift its ink layers. When focused, use the arrow keys to shift the layers.</span>
+<pre class="ink ink-red" aria-hidden="true">           ...:::::::::...
+        ..:---==========---:..
+      .:-==++++++****++++++==-:.
+     :-=+++***########***+++=-:
+    :-=++***###%%%%%%###***++=-:
+   .-=++**###%%@@@@@@@@%%###**++=-.
+   -=+**##%%@@@#@@@@@@#@@@%%##**+=-
+  .-=+**##%@@@*  O@@O  *@@@%##**+=-.
+  .-=+**#%@@@*  :@@@@:  *@@@%#**+=-.
+   -=+**#%@@@*  @@@@@@  *@@@%#**+=-
+   .-=+**#%@@@*  %@@%  *@@@%#**+=-.
+    :-=++**##%@@@+----+@@@%##**++=-:
+     :-=+++***##@@@##@@@##***+++=-:
+      .:-==+++++********+++++==-:.
+        ..:---============---:..
+           ...::::::::::::...</pre>
+<pre class="ink ink-blue" aria-hidden="true">           ...:::::::::...
+        ..:---==========---:..
+      .:-==++++++****++++++==-:.
+     :-=+++***########***+++=-:
+    :-=++***###%%%%%%###***++=-:
+   .-=++**###%%@@@@@@@@%%###**++=-.
+   -=+**##%%@@@#@@@@@@#@@@%%##**+=-
+  .-=+**##%@@@*  O@@O  *@@@%##**+=-.
+  .-=+**#%@@@*  :@@@@:  *@@@%#**+=-.
+   -=+**#%@@@*  @@@@@@  *@@@%#**+=-
+   .-=+**#%@@@*  %@@%  *@@@%#**+=-.
+    :-=++**##%@@@+----+@@@%##**++=-:
+     :-=+++***##@@@##@@@##***+++=-:
+      .:-==+++++********+++++==-:.
+        ..:---============---:..
+           ...::::::::::::...</pre>
+<pre class="ink ink-black" aria-hidden="true">           ...:::::::::...
+        ..:---==========---:..
+      .:-==++++++****++++++==-:.
+     :-=+++***########***+++=-:
+    :-=++***###%%%%%%###***++=-:
+   .-=++**###%%@@@@@@@@%%###**++=-.
+   -=+**##%%@@@#@@@@@@#@@@%%##**+=-
+  .-=+**##%@@@*  O@@O  *@@@%##**+=-.
+  .-=+**#%@@@*  :@@@@:  *@@@%#**+=-.
+   -=+**#%@@@*  @@@@@@  *@@@%#**+=-
+   .-=+**#%@@@*  %@@%  *@@@%#**+=-.
+    :-=++**##%@@@+----+@@@%##**++=-:
+     :-=+++***##@@@##@@@##***+++=-:
+      .:-==+++++********+++++==-:.
+        ..:---============---:..
+           ...::::::::::::...</pre>
+        </div>
+        <p class="caption"><span>▲ FACE / OFFSET</span><span>MOVE TO SMEAR</span></p>
+      </div>
+
+      <aside class="side-note" aria-label="Interaction notes">
+        <p><strong>Riso logic</strong><br>Blue finds red, red dodges black. The small mistakes make the page breathe.</p>
+        <p>▲ TOUCH / POINTER<br>▲ KEYBOARD SAFE<br>▲ OFFLINE ONLY</p>
+      </aside>
+    </section>
+
+    <footer class="footer">
+      <p>Printed somewhere between a desktop and a bad idea.</p>
+      <button id="noise-toggle" type="button" aria-pressed="false">Grain: Low</button>
+      <p>Paper stock: imagined / ink: stubborn</p>
+    </footer>
+  </main>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const portrait = document.querySelector('.portrait');
+      const button = document.getElementById('noise-toggle');
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      const setOffset = (clientX, clientY) => {
+        if (reduceMotion.matches) return;
+        const box = portrait.getBoundingClientRect();
+        const x = ((clientX - box.left) / box.width - .5) * 9;
+        const y = ((clientY - box.top) / box.height - .5) * 9;
+        root.style.setProperty('--shift-x', `${x.toFixed(2)}px`);
+        root.style.setProperty('--shift-y', `${y.toFixed(2)}px`);
+      };
+
+      portrait.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        portrait.setPointerCapture?.(event.pointerId);
+        setOffset(event.clientX, event.clientY);
+      }, { passive: false });
+      portrait.addEventListener('pointermove', (event) => {
+        event.preventDefault();
+        setOffset(event.clientX, event.clientY);
+      }, { passive: false });
+      portrait.addEventListener('touchmove', (event) => {
+        const touch = event.touches[0];
+        if (!touch) return;
+        event.preventDefault();
+        setOffset(touch.clientX, touch.clientY);
+      }, { passive: false });
+      portrait.addEventListener('keydown', (event) => {
+        const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+        if (!steps[event.key] || reduceMotion.matches) return;
+        event.preventDefault();
+        const [x, y] = steps[event.key];
+        root.style.setProperty('--shift-x', `${x * 4}px`);
+        root.style.setProperty('--shift-y', `${y * 4}px`);
+      });
+      button.addEventListener('click', () => {
+        const high = document.body.dataset.noise !== 'high';
+        document.body.dataset.noise = high ? 'high' : 'low';
+        button.setAttribute('aria-pressed', String(high));
+        button.textContent = `Grain: ${high ? 'High' : 'Low'}`;
+      });
+    })();
+  </script>
+</body>
+</html>

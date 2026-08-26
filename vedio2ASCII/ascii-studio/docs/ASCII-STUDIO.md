@@ -41,3 +41,19 @@
 - 机器 ffmpeg/ffprobe 在 `C:\Users\vitoriga\Tools\ffmpeg\bin\`，用于音频剥离/重编码对照，定位"文件特性"类问题。
 - 帧指纹法：对导出帧做粗哈希 + 记录源帧时间戳，一次区分"解码喂帧重复"还是"画布回读重复"。
 - 用看门狗把"静默挂死"转成"带标题报错"，避免无限 0% 进度。
+## 6. 字符集功能（自定义填充字符）
+
+- **能力**：右侧检查器新增「字符集」控件——5 个内置集（`01` 二进制、经典渐变、字母数字、矩阵风、纯符号）+ 自由输入框。字符集即填充码表：**首字符=最暗、尾字符=最亮**，任意字符都行（字母/数字/符号/空格/中文/emoji，系统等宽字体渲染）。
+- **架构**：旧 `glyphMask()` 程序化几何字形（7 档）已删除，改为 **WGSL atlas 取样**——worker 里 `AsciiPass` 用 `OffscreenCanvas` 把字符集画成一行 32px 字形纹理（`r8unorm`），`charCount` 作为亮度档位数进 uniform（第 9 个 slot，缓冲扩到 48B/12 槽）。字符集变化才重建 atlas；预览 / 实时通道 / 导出同一条渲染链路自动生效。
+- **参数**：`AsciiEffectParams.charset`（全局参数，协议 `set-ascii-effect` 自动透传，不涉及项目文档持久化）。上限 96 个码点（按 code point 计数，代理对不拆），atlas 宽 3072px 安全低于 8192 纹理上限。
+- **注意**：切换观感预设（矩阵绿等）会顺带改字符集；输入框防抖 250ms 提交，失焦立即提交，空输入回退默认字符集。
+
+## 7. 字符集上线即黑屏——atlas 上传被拒 + compute 阶段禁采样
+
+- **现象**：字符集功能上线后右边 ASCII 监视器全黑，左边原片正常。导出同链路也会黑。
+- **根因（两个叠加）**：
+  1. **上传被拒**：`copyExternalImageToTexture` 的目标纹理 usage 必须同时含 `COPY_DST` + **`RENDER_ATTACHMENT`**，只给 `COPY_DST` 时上传被 Dawn 拒收，atlas 全黑 → mask=0 → 画面全黑。报错 `Destination texture needs to have CopyDst and RenderAttachment usage.`
+  2. **管线创建即废**：`textureSample` 是 **@fragment 阶段专属内置函数，compute 管线禁用它**（`built-in cannot be used by compute pipeline stage`）。用 `textureSample` 采样 atlas 导致整个 ascii pipeline invalid，连锁 `GetBindGroupLayout → CreateBindGroup` 二次报错。
+- **修复**：atlas `usage` 加 `RENDER_ATTACHMENT`；WGSL 改 **`textureLoad(atlas, texelPos, 0)`** 按整数 texel 取字形（删掉采样器绑定）——compute 阶段仅 `textureLoad`/`textureStore` 合法。
+- **诊断链路**：worker 埋 `[ascii]` 日志——管线创建用 `pushErrorScope` 捕获真实首错（Dawn 的 async invalid 不抛同步异常，直接 try/catch 抓不到）；atlas 构建打字符数/尺寸/2d 上下文；上传用返回值错域打拒收原因。gpu.ts 全局 `uncapturederror` 打所有设备错误。
+- **本地复现**：此环境无头 Chrome 拿不到 WebGPU adapter（swiftshader/d3d11 组合均失败）；留了 `src/__browser__/ascii-black-repro.browser.test.ts`——无 GPU 自动跳过，有 GPU 的机器/CI 真编译 shader + 完整 pass + 像素读回验证 atlas 与输出非黑。

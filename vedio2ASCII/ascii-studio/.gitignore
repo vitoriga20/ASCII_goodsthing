@@ -182,3 +182,7 @@ audits/
 # Impeccable session output (design/live configuration stays tracked)
 **/.impeccable/hook.cache.json
 .impeccable/critique/
+
+# Browser test artifacts (failed-run screenshots, attachment snapshots)
+.vitest-attachments/
+src/__browser__/__screenshots__/

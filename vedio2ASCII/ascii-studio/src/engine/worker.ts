@@ -9157,10 +9157,17 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 		case 'set-loop':
 			handleSetLoop(cmd.enabled);
 			break;
-		case 'set-ascii-effect':
-			asciiEffect = normalizeAsciiEffect({ ...asciiEffect, ...cmd.params });
+		case 'set-ascii-effect': {
+			const nextAsciiEffect = normalizeAsciiEffect({ ...asciiEffect, ...cmd.params });
+			if (nextAsciiEffect.charset !== asciiEffect.charset) {
+				console.info(
+					`[ascii] charset → "${nextAsciiEffect.charset}" (${Array.from(nextAsciiEffect.charset).length} levels)`
+				);
+			}
+			asciiEffect = nextAsciiEffect;
 			renderer?.setAsciiEffect(asciiEffect);
 			break;
+		}
 		case 'export-probe':
 			void handleExportProbe();
 			break;

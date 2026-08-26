@@ -1,6 +1,8 @@
-import { For, type JSX } from 'solid-js';
+import { createEffect, createSignal, onCleanup, For, type JSX } from 'solid-js';
 import {
 	applyAsciiPreset,
+	ASCII_CHARSETS,
+	type AsciiCharsetId,
 	type AsciiEffectParams,
 	type AsciiPresetId
 } from '../engine/ascii-effect';
@@ -20,6 +22,16 @@ const PRESETS: ReadonlyArray<{ readonly id: AsciiPresetId; readonly label: strin
 	{ id: 'classic-mono', label: 'Classic Mono' },
 	{ id: 'high-detail', label: 'High Detail' }
 ];
+
+const CHARSET_LABELS: Record<AsciiCharsetId, (copy: ReturnType<typeof studioCopy>) => string> = {
+	binary: (c) => c.charsetBinary,
+	classic: (c) => c.charsetClassic,
+	letters: (c) => c.charsetLetters,
+	matrix: (c) => c.charsetMatrix,
+	symbols: (c) => c.charsetSymbols
+};
+
+const CHARSET_COMMIT_MS = 250;
 
 function RangeField(props: {
 	readonly label: string;
@@ -54,6 +66,38 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 			'classic-mono': copy().classicMono,
 			'high-detail': copy().highDetail
 		})[id];
+	// The charset input is a free-text field that commits debounced. The signal
+	// holds what the user is typing; the committed value lives in props. An
+	// external change (preset click) syncs the field, but only when it did not
+	// originate from this input, so typing is never clobbered by the effect.
+	// oxlint-disable-next-line solid/reactivity -- one-shot initial capture; live updates flow through the createEffect below
+	const [charsetText, setCharsetText] = createSignal(props.value().charset);
+	// oxlint-disable-next-line solid/reactivity -- one-shot initial capture of the last committed value
+	let committedCharset = props.value().charset;
+	let commitTimer: ReturnType<typeof setTimeout> | null = null;
+
+	createEffect(() => {
+		const current = props.value().charset;
+		if (current !== committedCharset) {
+			committedCharset = current;
+			setCharsetText(current);
+		}
+	});
+
+	function commitCharset(text: string) {
+		committedCharset = text;
+		props.onChange({ charset: text });
+	}
+
+	function scheduleCharsetCommit(text: string) {
+		if (commitTimer) clearTimeout(commitTimer);
+		commitTimer = setTimeout(() => commitCharset(text), CHARSET_COMMIT_MS);
+	}
+
+	onCleanup(() => {
+		if (commitTimer) clearTimeout(commitTimer);
+	});
+
 	return (
 		<section class="ascii-inspector" aria-label="ASCII effect controls">
 			<div class="ascii-inspector-heading">
@@ -83,6 +127,37 @@ export function AsciiInspector(props: AsciiInspectorProps): JSX.Element {
 						</button>
 					)}
 				</For>
+			</div>
+
+			<div class="ascii-charset" role="group" aria-label={copy().asciiCharset}>
+				<span class="ascii-charset-label">{copy().asciiCharset}</span>
+				<div class="ascii-preset-grid">
+					<For each={ASCII_CHARSETS}>
+						{(charset) => (
+							<button
+								type="button"
+								class="ascii-preset"
+								onClick={() => props.onChange({ charset: charset.chars })}
+							>
+								{CHARSET_LABELS[charset.id](copy())}
+							</button>
+						)}
+					</For>
+				</div>
+				<input
+					class="ascii-charset-input"
+					type="text"
+					spellcheck={false}
+					value={charsetText()}
+					placeholder={copy().customCharsetPlaceholder}
+					onInput={(event) => {
+						const text = event.currentTarget.value;
+						setCharsetText(text);
+						scheduleCharsetCommit(text);
+					}}
+					onBlur={() => commitCharset(charsetText())}
+				/>
+				<p class="ascii-charset-hint">{copy().customCharsetHint}</p>
 			</div>
 
 			<div class="ascii-fields">

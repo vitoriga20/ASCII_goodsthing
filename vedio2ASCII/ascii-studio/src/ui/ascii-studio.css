@@ -228,6 +228,40 @@ body {
 	padding: 0.35rem;
 }
 
+.ascii-charset {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.ascii-charset-label {
+	color: var(--text-muted);
+	font-size: var(--text-xs);
+}
+
+.ascii-charset-input {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid rgb(96 215 165 / 22%);
+	border-radius: 0.3rem;
+	background: #0a1812;
+	color: #ddede4;
+	font-family: var(--font-mono);
+	font-size: 0.7rem;
+	padding: 0.4rem 0.45rem;
+}
+
+.ascii-charset-input:focus {
+	border-color: #73dfad;
+	outline: none;
+}
+
+.ascii-charset-hint {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 0.62rem;
+	line-height: 1.45;
+}
+
 @media (max-width: 960px) {
 	.dual-monitor-grid {
 		grid-template-columns: 1fr;

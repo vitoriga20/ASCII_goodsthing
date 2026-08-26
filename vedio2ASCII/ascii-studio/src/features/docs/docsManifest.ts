@@ -5,6 +5,7 @@
  */
 import indexContent from './content/index.md?raw';
 import gettingStartedContent from './content/getting-started.md?raw';
+import asciiCharsetsContent from './content/ascii-charsets.md?raw';
 import importingMediaContent from './content/importing-media.md?raw';
 import timelineEditingContent from './content/timeline-editing.md?raw';
 import beatDetectionContent from './content/beat-detection.md?raw';
@@ -42,6 +43,7 @@ export const DOCS_INDEX_SLUG = 'index';
 export const DOC_SECTIONS: readonly DocSection[] = [
 	{ slug: DOCS_INDEX_SLUG, title: 'Overview', content: indexContent },
 	{ slug: 'getting-started', title: 'Getting started', content: gettingStartedContent },
+	{ slug: 'ascii-charsets', title: 'ASCII character sets', content: asciiCharsetsContent },
 	{ slug: 'importing-media', title: 'Importing media', content: importingMediaContent },
 	{ slug: 'timeline-editing', title: 'Timeline editing', content: timelineEditingContent },
 	{ slug: 'beat-detection', title: 'Beat detection', content: beatDetectionContent },

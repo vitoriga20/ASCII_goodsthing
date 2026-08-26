@@ -7,30 +7,24 @@ struct AsciiUniforms {
 	invert: f32,
 	edgeStrength: f32,
 	colourMode: f32,
+	charCount: f32,
+	_pad0: f32,
+	_pad1: f32,
+	_pad2: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: AsciiUniforms;
 @group(0) @binding(1) var src: texture_2d<f32>;
 @group(0) @binding(2) var dst: texture_storage_2d<rgba16float, write>;
+// Glyph atlas: one row of `charCount` square cells. textureSample is fragment-
+// stage-only, so the atlas must be read with textureLoad (integer texel
+// coords). The cell side is the ASCII_ATLAS_CELL constant in ascii-pass.ts.
+@group(0) @binding(3) var atlas: texture_2d<f32>;
+
+const atlasCell: u32 = 32u;
 
 fn luminance(colour: vec3f) -> f32 {
 	return dot(colour, vec3f(0.2126, 0.7152, 0.0722));
-}
-
-fn glyphMask(local: vec2f, level: f32) -> f32 {
-	let distanceFromCentre = length(local - vec2f(0.5));
-	let horizontal = step(0.44, local.x) * step(local.x, 0.56);
-	let vertical = step(0.44, local.y) * step(local.y, 0.56);
-	let diagonalA = step(abs(local.x - local.y), 0.10);
-	let diagonalB = step(abs((1.0 - local.x) - local.y), 0.10);
-	let ring = step(0.20, distanceFromCentre) * step(distanceFromCentre, 0.38);
-	if (level < 1.0) { return 0.0; }
-	if (level < 2.0) { return horizontal; }
-	if (level < 3.0) { return max(horizontal, vertical); }
-	if (level < 4.0) { return max(max(horizontal, vertical), diagonalA); }
-	if (level < 5.0) { return max(max(horizontal, vertical), max(diagonalA, diagonalB)); }
-	if (level < 6.0) { return max(ring, max(horizontal, vertical)); }
-	return 1.0;
 }
 
 fn outputColour(source: vec3f, mask: f32) -> vec3f {
@@ -60,6 +54,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 	value = select(value, step(u.threshold, value), u.threshold > 0.0);
 	let local = fract(vec2f(gid.xy) / cellSize);
 	let scaled = clamp((local - vec2f(0.5)) / u.glyphScale + vec2f(0.5), vec2f(0.0), vec2f(1.0));
-	let mask = glyphMask(scaled, floor(value * 7.0));
+	let levelCount = max(1.0, floor(u.charCount));
+	let index = min(levelCount - 1.0, floor(value * levelCount));
+	let glyphX = min(atlasCell - 1u, u32(floor(scaled.x * f32(atlasCell))));
+	let glyphY = min(atlasCell - 1u, u32(floor(scaled.y * f32(atlasCell))));
+	let mask = clamp(textureLoad(atlas, vec2u(u32(index) * atlasCell + glyphX, glyphY), 0).r, 0.0, 1.0);
 	textureStore(dst, gid.xy, vec4f(outputColour(centreColour.rgb, mask), centreColour.a));
 }

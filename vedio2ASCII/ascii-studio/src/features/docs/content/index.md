@@ -5,6 +5,7 @@ LocalCut Studio is a video editor that runs entirely in your browser. There is n
 ## What you can do
 
 - **Import** video, audio, and image files straight from your disk.
+- **ASCII style** any footage with the glyph treatment in the right-hand panel: real-time preview, presets, and free-form character sets. See [ASCII character sets](/docs/ascii-charsets).
 - **Edit** on a multi-track timeline: split, trim, move, ripple, transitions, titles, markers.
 - **Grade and mix**: per-clip effects, LUTs, keyframes, per-track gain/pan, fades, scopes.
 - **Caption**: import SRT/VTT subtitles, edit them inline, restyle them with animated presets, burn them in or export them — or auto-transcribe a clip on-device with the experimental Auto Captions feature (Whisper on ONNX Runtime Web). See [Captions](/docs/captions).

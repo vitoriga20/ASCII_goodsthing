@@ -1147,7 +1147,37 @@ async function encodeVideoRange(
 					const frameProvider = secondarySinkLayers.has(layer)
 						? secondarySinks.acquire(sourceHandle)
 						: sourceHandle.frameSource;
-					const decoded = await frameProvider?.frameAt(sourceTimestamp.adapterTimestampS);
+					if (frameIndex === startFrame || frameIndex % 60 === 0) {
+						console.log(
+							'[export-debug]   decode frame ' + frameIndex + ': source=' + layer.clip.sourceId +
+								' ts=' + sourceTimestamp.adapterTimestampS.toFixed(6) +
+								' provider=' + (frameProvider ? 'yes' : 'none')
+						);
+					}
+					const decoded =
+					frameIndex === startFrame
+						? await Promise.race([
+								Promise.resolve(frameProvider?.frameAt(sourceTimestamp.adapterTimestampS)),
+								new Promise<never>((_resolve, reject) =>
+									setTimeout(
+										() =>
+											reject(
+												new Error(
+													'[export-debug] frameAt TIMEOUT after 10s (source=' +
+														layer.clip.sourceId +
+														', ts=' +
+														sourceTimestamp.adapterTimestampS.toFixed(6) +
+														')'
+												)
+											),
+										10000
+									)
+								)
+							])
+						: await frameProvider?.frameAt(sourceTimestamp.adapterTimestampS);
+					if (frameIndex === startFrame || frameIndex % 60 === 0) {
+						console.log('[export-debug]   decode frame ' + frameIndex + ' done:', decoded ? 'ok' : 'none');
+					}
 					if (!decoded) continue;
 					decodedCount += 1;
 					let videoFrame: VideoFrame;

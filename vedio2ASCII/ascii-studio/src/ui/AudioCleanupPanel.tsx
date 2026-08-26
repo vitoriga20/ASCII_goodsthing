@@ -11,6 +11,7 @@
 import { createEffect, createSignal, onCleanup, Show, type Component } from 'solid-js';
 import { X } from 'lucide-solid';
 import { Button } from './components/button';
+import { studioCopy, studioLocale } from './locale';
 import {
 	CLEANUP_PREVIEW_SECONDS,
 	CLEANUP_PRIVACY_STATEMENT,
@@ -49,6 +50,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
+	const copy = () => studioCopy(studioLocale());
 	let panelRef: HTMLElement | undefined;
 	let audioContext: AudioContext | null = null;
 	let activeSource: AudioBufferSourceNode | null = null;
@@ -129,7 +131,7 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="audio-cleanup-panel-title">
-							Local Audio Cleanup (Experimental)
+							{copy().cleanupPanelTitle}
 						</p>
 						<p class="capability-panel-tier">{CLEANUP_PRIVACY_STATEMENT}</p>
 					</div>
@@ -137,8 +139,8 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 						size="icon"
 						variant="ghost"
 						onClick={props.onClose}
-						aria-label="Close audio cleanup panel"
-						title="Close audio cleanup panel"
+						aria-label={copy().closeCleanupPanel}
+						title={copy().closeCleanupPanel}
 					>
 						<X size={16} aria-hidden="true" />
 					</Button>
@@ -149,25 +151,25 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 					fallback={<p class="capability-panel-note">{CLEANUP_UNAVAILABLE_MESSAGE}</p>}
 				>
 					<section class="diagnostics-section">
-						<h2>Status</h2>
+						<h2>{copy().cleanupStatus}</h2>
 						<dl class="diagnostics-grid">
 							<div>
-								<dt>Engine</dt>
+								<dt>{copy().cleanupEngine}</dt>
 								<dd>{BACKEND_LABEL}</dd>
 							</div>
 							<div>
-								<dt>Model</dt>
+								<dt>{copy().cleanupModel}</dt>
 								<dd>
 									{props.state.modelStatus}
 									<Show when={props.state.accelerator}> via {props.state.accelerator}</Show>
 								</dd>
 							</div>
 							<div>
-								<dt>Model size</dt>
+								<dt>{copy().cleanupModelSize}</dt>
 								<dd>{formatBytes(props.state.modelSizeBytes)}</dd>
 							</div>
 							<div>
-								<dt>Last analysis</dt>
+								<dt>{copy().cleanupLastAnalysis}</dt>
 								<dd>
 									{props.state.lastAnalysisMs === null
 										? '—'
@@ -183,10 +185,10 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Clip</h2>
+						<h2>{copy().clip}</h2>
 						<Show
 							when={props.selectedClip}
-							fallback={<p class="capability-panel-note">Select an audio clip on the timeline.</p>}
+							fallback={<p class="capability-panel-note">{copy().selectAudioClip}</p>}
 						>
 							{(clip) => (
 								<p class="capability-panel-note">
@@ -195,7 +197,7 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 										{(applied) => (
 											<>
 												{' '}
-												· cleanup applied ({applied().modelId} {applied().modelVersion})
+												· {copy().cleanupApplied} ({applied().modelId} {applied().modelVersion})
 											</>
 										)}
 									</Show>
@@ -206,14 +208,17 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 							{(job) => (
 								<p class="capability-panel-note" aria-live="polite">
 									{job().phase === 'extracting'
-										? 'Extracting audio…'
+										? copy().extractingAudio
 										: job().phase === 'applying'
-											? 'Creating cleaned audio asset…'
-											: `Cleaning… ${Math.round(job().fraction * 100)}%`}
+											? copy().creatingCleanedAsset
+											: copy().cleaningPercent.replace(
+													'{n}',
+													`${Math.round(job().fraction * 100)}`
+												)}
 									<progress
 										value={job().fraction}
 										max={1}
-										aria-label="Cleanup progress"
+										aria-label={copy().cleanupProgress}
 										style={{ width: '100%', display: 'block', 'margin-top': '0.4rem' }}
 									/>
 								</p>
@@ -222,16 +227,16 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Actions</h2>
+						<h2>{copy().cleanupActions}</h2>
 						<div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
 							<Button
 								variant="secondary"
 								size="sm"
 								disabled={!availability().loadModel.enabled}
-								title={availability().loadModel.reason ?? 'Fetch and verify the local model'}
+								title={availability().loadModel.reason ?? copy().fetchVerifyModel}
 								onClick={props.onLoadModel}
 							>
-								Load model
+								{copy().loadModel}
 							</Button>
 							<Button
 								variant="secondary"
@@ -239,41 +244,38 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 								disabled={!availability().preview.enabled}
 								title={
 									availability().preview.reason ??
-									`Clean the first ${CLEANUP_PREVIEW_SECONDS} s for A/B comparison (loads the model first if needed)`
+									copy().previewCleanupTitle.replace('{n}', `${CLEANUP_PREVIEW_SECONDS}`)
 								}
 								onClick={props.onPreview}
 							>
-								Preview cleanup
+								{copy().previewCleanup}
 							</Button>
 							<Button
 								variant="secondary"
 								size="sm"
 								disabled={!availability().cancel.enabled}
-								title={availability().cancel.reason ?? 'Cancel the running operation'}
+								title={availability().cancel.reason ?? copy().cancelRunningOp}
 								onClick={props.onCancel}
 							>
-								Cancel
+								{copy().cancel}
 							</Button>
 							<Button
 								variant="default"
 								size="sm"
 								disabled={!availability().apply.enabled}
-								title={
-									availability().apply.reason ??
-									'Create a cleaned audio asset and route this clip through it (loads the model first if needed)'
-								}
+								title={availability().apply.reason ?? copy().applyCleanupTitle}
 								onClick={props.onApply}
 							>
-								Apply to export / create cleaned audio asset
+								{copy().applyToExport}
 							</Button>
 							<Show when={props.appliedCleanup}>
 								<Button
 									variant="outline"
 									size="sm"
-									title="Return this clip to its original audio (undoable)"
+									title={copy().removeCleanupTitle}
 									onClick={props.onRemoveCleanup}
 								>
-									Remove cleanup
+									{copy().removeCleanup}
 								</Button>
 							</Show>
 						</div>
@@ -282,21 +284,21 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 					<Show when={props.state.preview}>
 						{(preview) => (
 							<section class="diagnostics-section">
-								<h2>A/B preview ({preview().durationS.toFixed(1)} s)</h2>
+								<h2>{copy().abPreview.replace('{n}', preview().durationS.toFixed(1))}</h2>
 								<div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
 									<Button
 										variant={playing() === 'original' ? 'default' : 'secondary'}
 										size="sm"
 										onClick={() => playBuffer('original')}
 									>
-										Play original
+										{copy().playOriginal}
 									</Button>
 									<Button
 										variant={playing() === 'cleaned' ? 'default' : 'secondary'}
 										size="sm"
 										onClick={() => playBuffer('cleaned')}
 									>
-										Play cleaned
+										{copy().playCleaned}
 									</Button>
 									<Button
 										variant="outline"
@@ -304,7 +306,7 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 										disabled={playing() === null}
 										onClick={stopPlayback}
 									>
-										Stop
+										{copy().stop}
 									</Button>
 								</div>
 							</section>
@@ -312,10 +314,7 @@ export const AudioCleanupPanel: Component<AudioCleanupPanelProps> = (props) => {
 					</Show>
 				</Show>
 
-				<footer class="capability-panel-note">
-					Model: DTLN (MIT, Interspeech 2020) via ONNX Runtime Web. Weights load from this app's own
-					origin only after you click "Load model".
-				</footer>
+				<footer class="capability-panel-note">{copy().cleanupFooter}</footer>
 			</aside>
 		</Show>
 	);

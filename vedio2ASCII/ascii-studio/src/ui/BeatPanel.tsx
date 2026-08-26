@@ -7,6 +7,7 @@
 
 import { For, Show, createMemo } from 'solid-js';
 import type { MediaAssetSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,7 @@ export interface BeatPanelProps {
 // ---------------------------------------------------------------------------
 
 export function BeatPanel(props: BeatPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const audioSources = createMemo(() => props.assets().filter((a) => a.audio != null));
 
 	const hasBeatData = createMemo(() => props.beatResults().size > 0);
@@ -41,20 +43,20 @@ export function BeatPanel(props: BeatPanelProps) {
 	const autoCutDisabled = createMemo(() => !hasBeatData() || !hasSelection());
 
 	const autoCutTooltip = createMemo(() => {
-		if (!hasBeatData()) return 'No beat analysis available';
-		if (!hasSelection()) return 'Select clips to auto-cut';
+		if (!hasBeatData()) return copy().noBeatAnalysisAvailable;
+		if (!hasSelection()) return copy().selectClipsToAutoCut;
 		return '';
 	});
 
 	const snapLabel = createMemo(() => {
-		if (!hasBeatData()) return 'Analyse audio to enable beat-snap';
-		if (!hasEnabledSource()) return 'Enable a beat grid first';
-		return 'Snap to these beats';
+		if (!hasBeatData()) return copy().analyseAudioToEnableBeatSnap;
+		if (!hasEnabledSource()) return copy().enableBeatGridFirst;
+		return copy().snapToTheseBeats;
 	});
 
 	return (
-		<div class="beat-panel" role="region" aria-label="Beat analysis">
-			<h3 class="beat-panel-title">Beat Detection</h3>
+		<div class="beat-panel" role="region" aria-label={copy().beatAnalysis}>
+			<h3 class="beat-panel-title">{copy().beatDetection}</h3>
 
 			<label class="beat-panel-snap-link">
 				<input
@@ -87,13 +89,15 @@ export function BeatPanel(props: BeatPanelProps) {
 										fallback={
 											<Show
 												when={result()}
-												fallback={<span class="beat-panel-state">Not yet run</span>}
+												fallback={<span class="beat-panel-state">{copy().notYetRun}</span>}
 											>
-												<span class="beat-panel-state is-ready">Ready</span>
+												<span class="beat-panel-state is-ready">{copy().ready}</span>
 											</Show>
 										}
 									>
-										<span class="beat-panel-state is-busy">Analysing {progressPercent()}%</span>
+										<span class="beat-panel-state is-busy">
+											{copy().analysingN.replace('{n}', String(progressPercent()))}
+										</span>
 									</Show>
 								</div>
 
@@ -101,15 +105,17 @@ export function BeatPanel(props: BeatPanelProps) {
 									{(beatResult) => (
 										<div
 											class="beat-panel-result"
-											aria-label={`${beatResult.tempoBpm.toFixed(0)} BPM, ${beatResult.beatTimesMs.length} beats`}
+											aria-label={copy()
+												.bpmAndBeats.replace('{a}', beatResult.tempoBpm.toFixed(0))
+												.replace('{b}', String(beatResult.beatTimesMs.length))}
 										>
 											<span class="beat-panel-metric">
 												<strong>{beatResult.tempoBpm.toFixed(0)}</strong>
-												<span>BPM</span>
+												<span>{copy().bpm}</span>
 											</span>
 											<span class="beat-panel-metric">
 												<strong>{beatResult.beatTimesMs.length}</strong>
-												<span>beats</span>
+												<span>{copy().beatsCount}</span>
 											</span>
 										</div>
 									)}
@@ -123,9 +129,12 @@ export function BeatPanel(props: BeatPanelProps) {
 												type="button"
 												class="beat-panel-analyse-btn"
 												onClick={() => props.onAnalyse(source.sourceId)}
-												aria-label={`${result() ? 'Re-analyse' : 'Analyse'} beats for ${source.fileName}`}
+												aria-label={`${result() ? copy().reanalyseBeatsFor : copy().analyseBeatsFor}`.replace(
+													'{x}',
+													source.fileName
+												)}
 											>
-												{result() ? 'Re-analyse' : 'Analyse beats'}
+												{result() ? copy().reanalyse : copy().analyseBeats}
 											</button>
 										}
 									>
@@ -142,7 +151,7 @@ export function BeatPanel(props: BeatPanelProps) {
 													aria-valuenow={progressPercent()}
 													aria-valuemin={0}
 													aria-valuemax={100}
-													aria-label="Beat analysis progress"
+													aria-label={copy().beatAnalysisProgress}
 													style={{ transform: `scaleX(${progress() ?? 0})` }}
 												/>
 											</div>
@@ -150,9 +159,9 @@ export function BeatPanel(props: BeatPanelProps) {
 												type="button"
 												class="beat-panel-cancel-btn"
 												onClick={() => props.onCancel(source.sourceId)}
-												aria-label="Cancel beat analysis"
+												aria-label={copy().cancelBeatAnalysis}
 											>
-												Cancel
+												{copy().cancel}
 											</button>
 										</div>
 									</Show>
@@ -161,11 +170,14 @@ export function BeatPanel(props: BeatPanelProps) {
 										class={`beat-panel-toggle${isEnabled() ? ' is-active' : ''}`}
 										onClick={() => props.onToggleSource(source.sourceId, !isEnabled())}
 										aria-pressed={isEnabled()}
-										aria-label={`${isEnabled() ? 'Hide' : 'Show'} beat grid for ${source.fileName}`}
-										title={isEnabled() ? 'Hide beats' : 'Show beats'}
+										aria-label={`${isEnabled() ? copy().hideBeatGridFor : copy().showBeatGridFor}`.replace(
+											'{x}',
+											source.fileName
+										)}
+										title={isEnabled() ? copy().hideBeats : copy().showBeats}
 										disabled={!result()}
 									>
-										{isEnabled() ? 'Grid on' : 'Show grid'}
+										{isEnabled() ? copy().gridOn : copy().showGrid}
 									</button>
 								</div>
 							</div>
@@ -173,7 +185,7 @@ export function BeatPanel(props: BeatPanelProps) {
 					}}
 				</For>
 				<Show when={audioSources().length === 0}>
-					<p class="beat-panel-empty">Import some audio to detect beats.</p>
+					<p class="beat-panel-empty">{copy().importAudioToDetectBeats}</p>
 				</Show>
 			</div>
 
@@ -182,7 +194,7 @@ export function BeatPanel(props: BeatPanelProps) {
 				<div class="beat-panel-global">
 					<label class="beat-panel-offset-label">
 						<span class="beat-panel-field-head">
-							<span>Grid offset</span>
+							<span>{copy().gridOffset}</span>
 							<output>{props.beatSettings().globalOffsetMs} ms</output>
 						</span>
 						<input
@@ -192,7 +204,7 @@ export function BeatPanel(props: BeatPanelProps) {
 							step={1}
 							value={props.beatSettings().globalOffsetMs}
 							onInput={(e) => props.onOffsetChange(Number(e.currentTarget.value))}
-							aria-label="Global beat offset in milliseconds"
+							aria-label={copy().globalBeatOffsetMs}
 						/>
 					</label>
 					<div class="beat-panel-autocut">
@@ -201,20 +213,20 @@ export function BeatPanel(props: BeatPanelProps) {
 							class="beat-panel-autocut-btn"
 							onClick={() => props.onAutoCut('split')}
 							disabled={autoCutDisabled()}
-							title={autoCutTooltip() || 'Split clips at beats'}
+							title={autoCutTooltip() || copy().splitClipsAtBeats}
 							aria-disabled={autoCutDisabled()}
 						>
-							Split at beats
+							{copy().splitAtBeats}
 						</button>
 						<button
 							type="button"
 							class="beat-panel-autocut-btn"
 							onClick={() => props.onAutoCut('align')}
 							disabled={autoCutDisabled()}
-							title={autoCutTooltip() || 'Align clips to beats'}
+							title={autoCutTooltip() || copy().alignClipsToBeats}
 							aria-disabled={autoCutDisabled()}
 						>
-							Align to beats
+							{copy().alignToBeats}
 						</button>
 					</div>
 				</div>

@@ -12,6 +12,7 @@ import type {
 } from '../protocol';
 import { CaptionStyleInspector } from './CaptionStyleInspector';
 import { RailEmpty } from './RailEmpty';
+import { studioCopy, studioLocale } from './locale';
 
 interface TranscriptPanelProps {
 	captionTracks: CaptionTrackSnapshot[];
@@ -56,11 +57,13 @@ interface TranscriptPanelProps {
 	onDeleteCustomPreset: (presetId: string) => void;
 }
 
-const PRESETS: { value: CaptionPresetIdSnapshot; label: string }[] = [
-	{ value: 'subtitle', label: 'Subtitle' },
-	{ value: 'lower-third', label: 'Lower Third' },
-	{ value: 'note', label: 'Note' },
-	{ value: 'screencast', label: 'Screencast' }
+type Copy = ReturnType<typeof studioCopy>;
+
+const PRESETS: { value: CaptionPresetIdSnapshot; labelKey: keyof Copy }[] = [
+	{ value: 'subtitle', labelKey: 'presetSubtitle' },
+	{ value: 'lower-third', labelKey: 'presetLowerThird' },
+	{ value: 'note', labelKey: 'presetNote' },
+	{ value: 'screencast', labelKey: 'presetScreencast' }
 ];
 
 function formatTime(value: number): string {
@@ -74,15 +77,16 @@ function parseTime(value: string, fallback: number): number {
 	return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function cueLabel(count: number): string {
-	return `${count} cue${count === 1 ? '' : 's'}`;
+function cueLabel(c: Copy, count: number): string {
+	const template = count === 1 ? c.cueSingular : c.cueMany;
+	return template.replace('{n}', String(count));
 }
 
-function trackMeta(track: CaptionTrackSnapshot): string {
-	const language = track.language ? track.language.toUpperCase() : 'AUTO';
-	const subtitleState = track.burnedIn ? 'subtitles on' : 'sidecar';
-	const visibility = track.visible ? 'visible' : 'hidden';
-	return `${cueLabel(track.segments.length)} · ${language} · ${subtitleState} · ${visibility}`;
+function trackMeta(c: Copy, track: CaptionTrackSnapshot): string {
+	const language = track.language ? track.language.toUpperCase() : c.trackLanguageAuto;
+	const subtitleState = track.burnedIn ? c.subtitlesOn : c.subtitleSidecar;
+	const visibility = track.visible ? c.trackVisible : c.trackHidden;
+	return `${cueLabel(c, track.segments.length)} · ${language} · ${subtitleState} · ${visibility}`;
 }
 
 interface GeneratedTrackInfo {
@@ -90,7 +94,7 @@ interface GeneratedTrackInfo {
 	label: string;
 }
 
-function generatedTrackInfo(track: CaptionTrackSnapshot): GeneratedTrackInfo | null {
+function generatedTrackInfo(c: Copy, track: CaptionTrackSnapshot): GeneratedTrackInfo | null {
 	if (!track.generatedBy) return null;
 	try {
 		const parsed = JSON.parse(track.generatedBy) as {
@@ -107,15 +111,15 @@ function generatedTrackInfo(track: CaptionTrackSnapshot): GeneratedTrackInfo | n
 		const knownEngine = engine === 'ort-whisper';
 		return {
 			createdAt,
-			label: knownEngine ? 'Auto captions' : engine
+			label: knownEngine ? c.engineAutoCaptions : engine
 		};
 	} catch {
 		return null;
 	}
 }
 
-function formatGeneratedAt(info: GeneratedTrackInfo | null): string {
-	if (!info?.createdAt) return 'Generated';
+function formatGeneratedAt(c: Copy, info: GeneratedTrackInfo | null): string {
+	if (!info?.createdAt) return c.generatedFallback;
 	return formatIsoForDisplay(info.createdAt);
 }
 
@@ -128,6 +132,7 @@ function trackDuration(track: CaptionTrackSnapshot): string {
 }
 
 export function TranscriptPanel(props: TranscriptPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	let importInput: HTMLInputElement | undefined;
 	const activeTrack = createMemo(
 		() =>
@@ -211,12 +216,12 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 
 	const exportStem = createMemo(() => {
 		const track = activeTrack();
-		if (!track) return 'captions';
-		return track.name.trim().replace(/\s+/g, '-').toLowerCase() || 'captions';
+		if (!track) return copy().exportStemCaptions;
+		return track.name.trim().replace(/\s+/g, '-').toLowerCase() || copy().exportStemCaptions;
 	});
 	const autoCaptionTracks = createMemo(() =>
 		props.captionTracks
-			.map((track, index) => ({ track, index, info: generatedTrackInfo(track) }))
+			.map((track, index) => ({ track, index, info: generatedTrackInfo(copy(), track) }))
 			.filter((entry) => entry.info !== null)
 	);
 	const olderAutoCaptionTrackIds = createMemo(() => {
@@ -254,24 +259,30 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 		<section class="panel transcript-panel">
 			<div class="transcript-header">
 				<div>
-					<h2 class="panel-title">Transcript</h2>
-					<p class="transcript-subtitle">Caption tracks and timing</p>
+					<h2 class="panel-title">{copy().transcriptPanelTitle}</h2>
+					<p class="transcript-subtitle">{copy().transcriptPanelSubtitle}</p>
 				</div>
 				<div class="transcript-actions">
 					<Show when={olderAutoCaptionTrackIds().length > 0}>
 						<button
 							type="button"
 							class="button danger transcript-bulk-delete"
-							title={`Delete ${olderAutoCaptionTrackIds().length} older auto-caption track${olderAutoCaptionTrackIds().length === 1 ? '' : 's'} and keep the newest run`}
-							aria-label={`Delete ${olderAutoCaptionTrackIds().length} older auto-caption track${olderAutoCaptionTrackIds().length === 1 ? '' : 's'} and keep the newest run`}
+							title={copy().deleteOlderAutoCaptions.replace(
+								'{n}',
+								String(olderAutoCaptionTrackIds().length)
+							)}
+							aria-label={copy().deleteOlderAutoCaptions.replace(
+								'{n}',
+								String(olderAutoCaptionTrackIds().length)
+							)}
 							onClick={() => props.onDeleteTracks(olderAutoCaptionTrackIds())}
 						>
 							<Trash2 size={14} aria-hidden="true" />
-							Keep latest ({olderAutoCaptionTrackIds().length})
+							{copy().keepLatestN.replace('{n}', String(olderAutoCaptionTrackIds().length))}
 						</button>
 					</Show>
 					<button type="button" class="button secondary" onClick={() => importInput?.click()}>
-						Import
+						{copy().import}
 					</button>
 					<input
 						ref={(el) => (importInput = el)}
@@ -298,37 +309,35 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 							})
 						}
 					>
-						Export
+						{copy().export}
 					</button>
 				</div>
 			</div>
 
 			<Show
 				when={props.captionTracks.length > 0}
-				fallback={
-					<RailEmpty title="No captions yet">
-						Import an SRT or WebVTT file with the Import button above, or generate captions from a
-						selected clip with Auto Captions.
-					</RailEmpty>
-				}
+				fallback={<RailEmpty title={copy().noCaptionsYet}>{copy().noCaptionsHint}</RailEmpty>}
 			>
 				<Show when={activeTrack()}>
 					{(track) => {
-						const info = () => generatedTrackInfo(track());
+						const info = () => generatedTrackInfo(copy(), track());
 						return (
 							<div class="transcript-active-summary">
 								<div class="transcript-active-copy">
-									<span class="transcript-kicker">Active track</span>
+									<span class="transcript-kicker">{copy().activeTrackLabel}</span>
 									<strong>{track().name}</strong>
 									<span class="transcript-active-meta">
 										<span>
-											{cueLabel(track().segments.length)} · {trackDuration(track())} ·{' '}
-											{track().language ? track().language!.toUpperCase() : 'AUTO'}
+											{cueLabel(copy(), track().segments.length)} · {trackDuration(track())} ·{' '}
+											{track().language
+												? track().language!.toUpperCase()
+												: copy().trackLanguageAuto}
 										</span>
 										<Show when={autoCaptionTracks().length > 1}>
 											<span>
-												{autoCaptionTracks().length} generated runs ·{' '}
-												{olderAutoCaptionTrackIds().length} older
+												{copy()
+													.generatedRunsOlder.replace('{n}', String(autoCaptionTracks().length))
+													.replace('{m}', String(olderAutoCaptionTrackIds().length))}
 											</span>
 										</Show>
 									</span>
@@ -338,7 +347,9 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 										{(generated) => (
 											<>
 												<span class="transcript-pill">{generated().label}</span>
-												<span class="transcript-muted">{formatGeneratedAt(generated())}</span>
+												<span class="transcript-muted">
+													{formatGeneratedAt(copy(), generated())}
+												</span>
 											</>
 										)}
 									</Show>
@@ -351,7 +362,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 				<div class="transcript-track-list">
 					<For each={props.captionTracks}>
 						{(track) => {
-							const info = () => generatedTrackInfo(track);
+							const info = () => generatedTrackInfo(copy(), track);
 							return (
 								<div
 									class={`transcript-track-card${activeTrack()?.id === track.id ? ' is-active' : ''}`}
@@ -371,19 +382,21 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 											</Show>
 										</span>
 										<span class="transcript-track-meta">
-											{trackMeta(track)} · {trackDuration(track)}
+											{trackMeta(copy(), track)} · {trackDuration(track)}
 										</span>
 										<Show when={info()}>
 											{(generated) => (
-												<span class="transcript-track-meta">{formatGeneratedAt(generated())}</span>
+												<span class="transcript-track-meta">
+													{formatGeneratedAt(copy(), generated())}
+												</span>
 											)}
 										</Show>
 									</button>
 									<button
 										type="button"
 										class="transcript-icon-button danger"
-										title={`Delete ${track.name}`}
-										aria-label={`Delete ${track.name}`}
+										title={copy().deleteTrackLabel.replace('{name}', track.name)}
+										aria-label={copy().deleteTrackLabel.replace('{name}', track.name)}
 										onClick={() => props.onDeleteTrack(track.id)}
 									>
 										<Trash2 size={14} aria-hidden="true" />
@@ -399,7 +412,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 						<>
 							<div class="transcript-track-controls">
 								<label>
-									<span>Name</span>
+									<span>{copy().nameField}</span>
 									<input
 										value={track().name}
 										onChange={(event) =>
@@ -408,7 +421,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 									/>
 								</label>
 								<label>
-									<span>Language</span>
+									<span>{copy().languageLabel}</span>
 									<input
 										value={track().language ?? ''}
 										placeholder="en"
@@ -425,7 +438,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 											props.onSetTrack(track().id, { burnedIn: event.currentTarget.checked })
 										}
 									/>
-									<span>Subtitles</span>
+									<span>{copy().burnInCheckbox}</span>
 								</label>
 								<label class="transcript-inline-check">
 									<input
@@ -435,10 +448,10 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 											props.onSetTrack(track().id, { visible: event.currentTarget.checked })
 										}
 									/>
-									<span>Visible</span>
+									<span>{copy().visibleToggle}</span>
 								</label>
 								<label>
-									<span>Preset (Phase 22 layout)</span>
+									<span>{copy().presetPhase22}</span>
 									<select
 										value={
 											(track().defaultStyle.presetId === 'subtitle' ||
@@ -456,12 +469,12 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 										}
 									>
 										<For each={PRESETS}>
-											{(preset) => <option value={preset.value}>{preset.label}</option>}
+											{(preset) => <option value={preset.value}>{copy()[preset.labelKey]}</option>}
 										</For>
 									</select>
 								</label>
 								<div class="caption-anim-style-section">
-									<div class="caption-anim-style-heading">Animated style (Phase 30)</div>
+									<div class="caption-anim-style-heading">{copy().animatedStylePhase30}</div>
 									<CaptionStyleInspector
 										presetId={track().defaultStyle.presetId ?? 'subtitle'}
 										customPresets={props.customAnimCaptionPresets}
@@ -473,7 +486,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 									/>
 								</div>
 								<label>
-									<span>Font size</span>
+									<span>{copy().fontSizeLabel}</span>
 									<input
 										type="number"
 										min="16"
@@ -496,8 +509,8 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 							<div class="transcript-workspace">
 								<div class="transcript-list-pane">
 									<div class="transcript-section-header">
-										<span>Segments</span>
-										<span>{cueLabel(track().segments.length)}</span>
+										<span>{copy().segmentsLabel}</span>
+										<span>{cueLabel(copy(), track().segments.length)}</span>
 									</div>
 									<div class="transcript-segment-list">
 										<Show when={segmentWindow().before > 0}>
@@ -506,7 +519,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 												class="transcript-window-hint"
 												onClick={() => pageWindow(-1)}
 											>
-												Show {segmentWindow().before} earlier
+												{copy().showEarlier.replace('{n}', String(segmentWindow().before))}
 											</button>
 										</Show>
 										<For each={visibleSegments()}>
@@ -517,7 +530,10 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 													<input
 														class="transcript-row-select"
 														type="checkbox"
-														aria-label={`Select segment ${segmentWindow().start + index() + 1}`}
+														aria-label={copy().selectSegmentLabel.replace(
+															'{n}',
+															String(segmentWindow().start + index() + 1)
+														)}
 														checked={selectedIdSet().has(segment.id)}
 														onChange={(event) =>
 															toggleSegment(segment.id, event.currentTarget.checked)
@@ -550,7 +566,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 												class="transcript-window-hint"
 												onClick={() => pageWindow(1)}
 											>
-												Show {segmentWindow().after} later
+												{copy().showLater.replace('{n}', String(segmentWindow().after))}
 											</button>
 										</Show>
 									</div>
@@ -559,19 +575,19 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 								<div class="transcript-editor-pane">
 									<Show
 										when={activeSegment()}
-										fallback={<p class="placeholder-text">No segment selected.</p>}
+										fallback={<p class="placeholder-text">{copy().noSegmentSelected}</p>}
 									>
 										{(segment) => (
 											<div class="transcript-editor">
 												<div class="transcript-section-header">
-													<span>Edit segment</span>
+													<span>{copy().editSegment}</span>
 													<span>
 														{formatTime(segment().start)} -{' '}
 														{formatTime(segment().start + segment().duration)}
 													</span>
 												</div>
 												<label>
-													<span>Text</span>
+													<span>{copy().text}</span>
 													<textarea
 														value={draftText()}
 														rows={5}
@@ -583,7 +599,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 												</label>
 												<div class="transcript-timing-grid">
 													<label>
-														<span>Start</span>
+														<span>{copy().start}</span>
 														<input
 															value={formatTime(segment().start)}
 															onChange={(event) =>
@@ -597,7 +613,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 														/>
 													</label>
 													<label>
-														<span>End</span>
+														<span>{copy().endLabel}</span>
 														<input
 															value={formatTime(segment().start + segment().duration)}
 															onChange={(event) =>
@@ -614,7 +630,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 														/>
 													</label>
 													<label>
-														<span>Color</span>
+														<span>{copy().colorLabel}</span>
 														<input
 															type="color"
 															value={
@@ -630,7 +646,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 														/>
 													</label>
 													<label>
-														<span>Background</span>
+														<span>{copy().backgroundLabel}</span>
 														<input
 															type="color"
 															value={
@@ -654,7 +670,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 															props.onSplit(track().id, segment().id, props.playheadTime)
 														}
 													>
-														Split at playhead
+														{copy().splitAtPlayhead}
 													</button>
 													<button
 														type="button"
@@ -662,28 +678,28 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 														disabled={props.selectedSegmentIds.length < 2}
 														onClick={() => props.onMerge(track().id, props.selectedSegmentIds)}
 													>
-														Merge selected
+														{copy().mergeSelected}
 													</button>
 													<button
 														type="button"
 														class="button secondary"
 														onClick={() => props.onSnap(track().id, segment().id, 'start')}
 													>
-														Snap start
+														{copy().snapStart}
 													</button>
 													<button
 														type="button"
 														class="button secondary"
 														onClick={() => props.onSnap(track().id, segment().id, 'end')}
 													>
-														Snap end
+														{copy().snapEnd}
 													</button>
 													<button
 														type="button"
 														class="button secondary"
 														onClick={() => props.onSnap(track().id, segment().id, 'both')}
 													>
-														Snap both
+														{copy().snapBoth}
 													</button>
 													<button
 														type="button"
@@ -697,7 +713,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 															)
 														}
 													>
-														Delete
+														{copy().delete}
 													</button>
 												</div>
 											</div>

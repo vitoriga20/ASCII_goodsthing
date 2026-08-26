@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import type { TransformParamsSnapshot } from '../protocol';
 import { computeFitRect } from '../engine/transform';
+import { studioCopy, studioLocale } from './locale';
 
 export interface PreviewGizmoProps {
 	transform: TransformParamsSnapshot;
@@ -48,6 +49,7 @@ const CORNERS = [
  * normalized transform params and emits `set-transform` updates.
  */
 export function PreviewGizmo(props: PreviewGizmoProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [box, setBox] = createSignal<Box | null>(null);
 	const [drag, setDrag] = createSignal<DragState | null>(null);
 
@@ -188,7 +190,7 @@ export function PreviewGizmo(props: PreviewGizmoProps) {
 					<div
 						class="preview-gizmo-body"
 						onPointerDown={(e) => beginDrag('move', e)}
-						title="Drag to reposition"
+						title={copy().dragToReposition}
 					/>
 					<For each={CORNERS}>
 						{(corner) => (
@@ -196,14 +198,14 @@ export function PreviewGizmo(props: PreviewGizmoProps) {
 								class="preview-gizmo-handle"
 								style={{ left: `${corner.x * 100}%`, top: `${corner.y * 100}%` }}
 								onPointerDown={(e) => beginDrag('scale', e)}
-								title="Drag to scale"
+								title={copy().dragToScale}
 							/>
 						)}
 					</For>
 					<div
 						class="preview-gizmo-rotate"
 						onPointerDown={(e) => beginDrag('rotate', e)}
-						title="Drag to rotate"
+						title={copy().dragToRotate}
 					/>
 				</div>
 			)}

@@ -9,6 +9,7 @@ import { modifierGlyphs } from './platform';
 
 function options(overrides: Partial<MenuBarBuildOptions> = {}): MenuBarBuildOptions {
 	return {
+		locale: 'en',
 		glyphs: modifierGlyphs(true),
 		importBlocked: false,
 		canUndo: true,
@@ -175,6 +176,7 @@ function commandOptions(
 ): CommandActionsBuildOptions {
 	const noop = () => {};
 	return {
+		locale: 'en',
 		importHint: null,
 		importBlocked: false,
 		playing: false,
@@ -208,7 +210,7 @@ describe('buildCommandActions (IA-T1 / D13 launcher routing, D12 audio gating)',
 			'Audio Cleanup',
 			'Auto captions',
 			'Language Tools',
-			'Smart reframe',
+			'Smart Reframe',
 			'Remove silences',
 			'Go live',
 			'Browser capabilities',
@@ -261,7 +263,7 @@ describe('buildCommandActions (IA-T1 / D13 launcher routing, D12 audio gating)',
 
 	it('routes dock-rail workflow launchers into the command palette (IA-T6)', () => {
 		const labels = buildCommandActions(commandOptions()).map((action) => action.label);
-		for (const expected of ['Record', 'Captions', 'View scopes', 'Render queue']) {
+		for (const expected of ['Record', 'Captions', 'View scopes', 'Render Queue']) {
 			expect(labels).toContain(expected);
 		}
 	});

@@ -1,3 +1,4 @@
+import { studioCopy, studioLocale } from './locale';
 import { createMemo, For, Show } from 'solid-js';
 import { Play, X, RotateCcw, Trash2, Square } from 'lucide-solid';
 import { Button } from './components/button';
@@ -15,21 +16,22 @@ interface RenderQueuePanelProps {
 }
 
 function statusBadge(status: RenderQueueJob['status']): string {
+	const copy = () => studioCopy(studioLocale());
 	switch (status) {
 		case 'pending':
-			return 'Pending';
+			return copy().statusPending;
 		case 'choosing-destination':
-			return 'Choosing file…';
+			return copy().statusChoosing;
 		case 'running':
-			return 'Running';
+			return copy().statusRunning;
 		case 'finalizing':
-			return 'Finalizing';
+			return copy().statusFinalizing;
 		case 'completed':
-			return 'Done';
+			return copy().statusDone;
 		case 'failed':
-			return 'Failed';
+			return copy().statusFailed;
 		case 'canceled':
-			return 'Canceled';
+			return copy().statusCanceled;
 	}
 }
 
@@ -72,6 +74,7 @@ function formatElapsed(seconds: number | null): string {
 }
 
 export function RenderQueuePanel(props: RenderQueuePanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const pendingCount = createMemo(
 		() => props.queue.jobs.filter((j) => j.status === 'pending').length
 	);
@@ -84,11 +87,11 @@ export function RenderQueuePanel(props: RenderQueuePanelProps) {
 
 	return (
 		<Show when={totalJobs() > 0}>
-			<section class="render-queue-panel" aria-label="Render Queue">
+			<section class="render-queue-panel" aria-label={copy().renderQueue}>
 				<div class="render-queue-header">
 					<h3 class="render-queue-title">
-						Render Queue{' '}
-						<span class="text-xs text-muted-foreground font-normal">(Experimental)</span>
+						{copy().renderQueue}{' '}
+						<span class="text-xs text-muted-foreground font-normal">({copy().experimental})</span>
 						<span class="render-queue-count">
 							{completedCount()}/{totalJobs()}
 						</span>
@@ -100,20 +103,20 @@ export function RenderQueuePanel(props: RenderQueuePanelProps) {
 								checked={props.queue.stopOnError}
 								onChange={(e) => props.onSetStopOnError(e.currentTarget.checked)}
 							/>
-							<span>Stop on error</span>
+							<span>{copy().stopOnError}</span>
 						</label>
-						<Show when={hasPending() && !hasActive()}>
-							<Button variant="default" onClick={() => props.onStart()}>
-								<Play size={12} aria-hidden="true" />
-								Start
-							</Button>
-						</Show>
-						<Show when={hasActive()}>
-							<Button onClick={() => props.onCancelAll()}>
-								<Square size={12} aria-hidden="true" />
-								Stop
-							</Button>
-						</Show>
+<Show when={hasPending() && !hasActive()}>
+								<Button variant="default" onClick={() => props.onStart()}>
+									<Play size={12} aria-hidden="true" />
+									{copy().start}
+								</Button>
+							</Show>
+							<Show when={hasActive()}>
+								<Button onClick={() => props.onCancelAll()}>
+									<Square size={12} aria-hidden="true" />
+									{copy().stop}
+								</Button>
+							</Show>
 					</div>
 				</div>
 
@@ -159,9 +162,9 @@ export function RenderQueuePanel(props: RenderQueuePanelProps) {
 								</Show>
 
 								<Show when={job.coverExportError}>
-									<p class="render-queue-job-cover-warning">
-										Cover export failed: {job.coverExportError}
-									</p>
+<p class="render-queue-job-cover-warning">
+											{copy().coverExportFailed.replace('{x}', job.coverExportError ?? '')}
+										</p>
 								</Show>
 
 								<Show when={job.status === 'completed' && job.outputFileName}>
@@ -176,35 +179,35 @@ export function RenderQueuePanel(props: RenderQueuePanelProps) {
 											job.status !== 'finalizing'
 										}
 									>
-										<button
-											type="button"
-											class="render-queue-icon-btn"
-											aria-label="Remove job"
-											title="Remove job"
-											onClick={() => props.onRemove(job.id)}
-										>
+											<button
+												type="button"
+												class="render-queue-icon-btn"
+												aria-label={copy().removeJob}
+												title={copy().removeJob}
+												onClick={() => props.onRemove(job.id)}
+											>
 											<Trash2 size={13} />
 										</button>
 									</Show>
 									<Show when={job.status === 'running' || job.status === 'choosing-destination'}>
-										<button
-											type="button"
-											class="render-queue-icon-btn"
-											aria-label="Cancel job"
-											title="Cancel job"
-											onClick={() => props.onCancelJob(job.id)}
-										>
+											<button
+												type="button"
+												class="render-queue-icon-btn"
+												aria-label={copy().cancelJob}
+												title={copy().cancelJob}
+												onClick={() => props.onCancelJob(job.id)}
+											>
 											<X size={13} />
 										</button>
 									</Show>
 									<Show when={job.status === 'failed' || job.status === 'canceled'}>
-										<button
-											type="button"
-											class="render-queue-icon-btn"
-											aria-label="Retry job"
-											title="Retry job"
-											onClick={() => props.onRetry(job.id)}
-										>
+											<button
+												type="button"
+												class="render-queue-icon-btn"
+												aria-label={copy().retryJob}
+												title={copy().retryJob}
+												onClick={() => props.onRetry(job.id)}
+											>
 											<RotateCcw size={13} />
 										</button>
 									</Show>

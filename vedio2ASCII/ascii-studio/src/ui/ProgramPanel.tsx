@@ -18,6 +18,7 @@ import type {
 } from '../protocol';
 import { captureUnavailableReasons } from '../engine/capture-reasons';
 import { CaptureUnavailableNotice } from './CaptureUnavailableNotice';
+import { studioCopy, studioLocale } from './locale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +73,7 @@ const HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 // ---------------------------------------------------------------------------
 
 export function ProgramPanel(props: ProgramPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const isDisabled = createMemo(() => props.programMode() !== 'supported');
 	const isIdle = createMemo(() => props.sessionState() === 'idle');
 	const isRunning = createMemo(
@@ -109,20 +111,26 @@ export function ProgramPanel(props: ProgramPanelProps) {
 	const disabledReasons = createMemo(() => {
 		if (!props.probe) return [];
 		const reasons = captureUnavailableReasons(props.probe);
-		return reasons.length > 0 ? reasons : ['Required capabilities are missing.'];
+		return reasons.length > 0 ? reasons : [copy().requiredCapabilitiesMissing];
 	});
 
 	return (
 		<Show
 			when={!isDisabled()}
 			fallback={
-				<div class="program-panel program-panel--disabled" role="region" aria-label="Program Mode">
-					<h3>Program Mode</h3>
+				<div
+					class="program-panel program-panel--disabled"
+					role="region"
+					aria-label={copy().programMode}
+				>
+					<h3>{copy().programMode}</h3>
 					<Show
 						when={props.probe}
-						fallback={<p class="program-panel-disabled-reason">Checking browser capabilities…</p>}
+						fallback={
+							<p class="program-panel-disabled-reason">{copy().checkingCapabilities}</p>
+						}
 					>
-						<CaptureUnavailableNotice subject="Program Mode" reasons={disabledReasons()} />
+						<CaptureUnavailableNotice subject={copy().programMode} reasons={disabledReasons()} />
 					</Show>
 				</div>
 			}
@@ -130,11 +138,11 @@ export function ProgramPanel(props: ProgramPanelProps) {
 			<div
 				class="program-panel"
 				role="region"
-				aria-label="Program Mode"
+				aria-label={copy().programMode}
 				tabIndex={0}
 				onKeyDown={handleKeydown}
 			>
-				<h3 class="program-panel-title">Program Mode</h3>
+				<h3 class="program-panel-title">{copy().programMode}</h3>
 
 				{/* Error display */}
 				<Show when={props.error()}>
@@ -145,32 +153,32 @@ export function ProgramPanel(props: ProgramPanelProps) {
 
 				{/* Source acquisition (idle only) */}
 				<Show when={isIdle()}>
-					<div class="program-panel-sources" role="group" aria-label="Sources">
-						<h4>Sources</h4>
+					<div class="program-panel-sources" role="group" aria-label={copy().sourcesLabel}>
+						<h4>{copy().sourcesLabel}</h4>
 						<div class="program-panel-source-actions">
 							<button
 								type="button"
 								class="program-panel-btn"
 								onClick={() => props.onAddScreen()}
-								aria-label="Add screen source"
+								aria-label={copy().addScreenSourceAria}
 							>
-								+ Screen
+								{copy().addScreenSource}
 							</button>
 							<button
 								type="button"
 								class="program-panel-btn"
 								onClick={() => props.onAddCamera('')}
-								aria-label="Add camera source"
+								aria-label={copy().addCameraSourceAria}
 							>
-								+ Camera
+								{copy().addCameraSource}
 							</button>
 							<button
 								type="button"
 								class="program-panel-btn"
 								onClick={() => props.onAddMic('')}
-								aria-label="Add microphone"
+								aria-label={copy().addMicrophoneAria}
 							>
-								+ Mic
+								{copy().addMicSource}
 							</button>
 						</div>
 						<For each={props.acquiredSources()}>
@@ -182,7 +190,7 @@ export function ProgramPanel(props: ProgramPanelProps) {
 										type="button"
 										class="program-panel-remove-btn"
 										onClick={() => props.onRemoveSource(source.sourceId)}
-										aria-label={`Remove ${source.label}`}
+										aria-label={copy().removeSourceAria.replace('{label}', source.label)}
 									>
 										×
 									</button>
@@ -193,18 +201,18 @@ export function ProgramPanel(props: ProgramPanelProps) {
 				</Show>
 
 				{/* Scene editor */}
-				<div class="program-panel-scenes" role="group" aria-label="Scenes">
+				<div class="program-panel-scenes" role="group" aria-label={copy().scenes}>
 					<div class="program-panel-scenes-header">
-						<h4>Scenes</h4>
+						<h4>{copy().scenes}</h4>
 						<Show when={isIdle()}>
 							<button
 								type="button"
 								class="program-panel-btn"
 								onClick={() => props.onAddScene()}
 								disabled={props.scenes().length >= 9}
-								aria-label="Add scene"
+								aria-label={copy().addSceneAria}
 							>
-								+ Scene
+								{copy().addScene}
 							</button>
 						</Show>
 					</div>
@@ -236,22 +244,22 @@ export function ProgramPanel(props: ProgramPanelProps) {
 										class="program-panel-scene-name-input"
 										value={scene.name}
 										onChange={(e) => props.onRenameScene(scene.id, e.currentTarget.value)}
-										aria-label={`Scene name for ${scene.name}`}
+										aria-label={copy().sceneNameAria.replace('{name}', scene.name)}
 									/>
 									<select
 										class="program-panel-hotkey-select"
 										value={scene.hotkey ?? ''}
 										onChange={(e) => props.onSetHotkey(scene.id, e.currentTarget.value || null)}
-										aria-label={`Hotkey for ${scene.name}`}
+										aria-label={copy().hotkeyForAria.replace('{name}', scene.name)}
 									>
-										<option value="">No hotkey</option>
+										<option value="">{copy().noHotkey}</option>
 										<For each={HOTKEYS}>{(key) => <option value={key}>{key}</option>}</For>
 									</select>
 									<button
 										type="button"
 										class="program-panel-remove-btn"
 										onClick={() => props.onRemoveScene(scene.id)}
-										aria-label={`Remove scene ${scene.name}`}
+										aria-label={copy().removeSceneAria.replace('{name}', scene.name)}
 									>
 										×
 									</button>
@@ -264,18 +272,20 @@ export function ProgramPanel(props: ProgramPanelProps) {
 				{/* Budget display */}
 				<div class="program-panel-budget" role="status" aria-live="polite" aria-atomic="true">
 					<span>
-						Encoder budget: {props.budgetUsage().active} / {props.budgetUsage().max}
+						{copy()
+							.encoderBudget.replace('{active}', String(props.budgetUsage().active))
+							.replace('{max}', String(props.budgetUsage().max))}
 					</span>
 				</div>
 
-				<div class="program-panel-options" role="group" aria-label="Program transition options">
+				<div class="program-panel-options" role="group" aria-label={copy().transitionOptions}>
 					<label class="program-panel-toggle">
 						<input
 							type="checkbox"
 							checked={props.transitionMs() === 200}
 							onChange={(event) => props.onSetTransitionMs(event.currentTarget.checked ? 200 : 0)}
 						/>
-						<span>Crossfade scene switches</span>
+						<span>{copy().crossfadeSceneSwitches}</span>
 					</label>
 				</div>
 
@@ -289,9 +299,9 @@ export function ProgramPanel(props: ProgramPanelProps) {
 								class="program-panel-stop-btn"
 								onClick={props.onStop}
 								disabled={props.sessionState() === 'stopping'}
-								aria-label="Stop program session"
+								aria-label={copy().stopProgramSessionAria}
 							>
-								{props.sessionState() === 'stopping' ? 'Stopping…' : 'Stop'}
+								{props.sessionState() === 'stopping' ? copy().stopping : copy().stop}
 							</button>
 						}
 					>
@@ -303,9 +313,9 @@ export function ProgramPanel(props: ProgramPanelProps) {
 								const firstScene = props.scenes()[0];
 								if (firstScene) props.onStart(firstScene.id);
 							}}
-							aria-label="Start program session"
+							aria-label={copy().startProgramSessionAria}
 						>
-							Start
+							{copy().start}
 						</button>
 					</Show>
 				</div>
@@ -314,7 +324,7 @@ export function ProgramPanel(props: ProgramPanelProps) {
 				<Show when={isRunning()}>
 					<div class="program-panel-status" role="status" aria-live="polite" aria-atomic="true">
 						<div class="program-panel-active-scene">
-							Active:{' '}
+							{copy().activeLabel}{' '}
 							{props.activeSceneId()
 								? (props.scenes().find((s) => s.id === props.activeSceneId())?.name ?? '—')
 								: '—'}
@@ -331,14 +341,16 @@ export function ProgramPanel(props: ProgramPanelProps) {
 									>
 										<span>{src.label}</span>
 										<Show when={src.preEncodeDrops > 0}>
-											<span class="program-panel-drops">{src.preEncodeDrops} drops</span>
+											<span class="program-panel-drops">
+												{copy().drops.replace('{n}', String(src.preEncodeDrops))}
+											</span>
 										</Show>
 									</div>
 								)}
 							</For>
 						</div>
-						<div class="program-panel-hotkey-hint" aria-label="Press 1-9 to switch scenes">
-							Press 1–9 to switch scenes
+						<div class="program-panel-hotkey-hint" aria-label={copy().pressKeysToSwitch}>
+							{copy().pressKeysToSwitch}
 						</div>
 					</div>
 				</Show>

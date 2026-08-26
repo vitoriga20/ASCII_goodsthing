@@ -15,6 +15,7 @@ import {
 	VolumeX
 } from 'lucide-solid';
 import { type TimelineTrackSnapshot as ProtocolTimelineTrack } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 interface TimelineTrackProps {
 	track: ProtocolTimelineTrack;
@@ -31,6 +32,7 @@ interface TimelineTrackProps {
 
 /** Track label + management controls (reorder / remove) for timeline mirror models. */
 export function TimelineTrack(props: TimelineTrackProps) {
+	const copy = () => studioCopy(studioLocale());
 	return (
 		<div class="track-label">
 			<span class="track-label-main">
@@ -42,20 +44,20 @@ export function TimelineTrack(props: TimelineTrackProps) {
 				<span>{props.track.id}</span>
 			</span>
 			<span class="track-label-meta">
-				{props.track.clips.length} clip{props.track.clips.length === 1 ? '' : 's'}
+				{copy().clipCount.replace('{n}', String(props.track.clips.length))}
 			</span>
 			<Show when={props.track.solo || props.track.muted}>
 				<span class="track-badges">
 					{props.track.solo ? (
 						<span class="track-badge">
 							<Headphones size={11} aria-hidden="true" />
-							Solo
+							{copy().solo}
 						</span>
 					) : null}
 					{props.track.muted ? (
 						<span class="track-badge is-muted">
 							<VolumeX size={11} aria-hidden="true" />
-							Muted
+							{copy().muted}
 						</span>
 					) : null}
 				</span>
@@ -65,9 +67,12 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					type="button"
 					class={`track-control-button${props.track.locked ? ' is-active' : ''}`}
 					onClick={() => props.onSetLock(!props.track.locked)}
-					aria-label={props.track.locked ? `Unlock ${props.track.id}` : `Lock ${props.track.id}`}
+					aria-label={`${props.track.locked ? copy().unlockX : copy().lockX}`.replace(
+						'{x}',
+						props.track.id
+					)}
 					aria-pressed={props.track.locked}
-					title={props.track.locked ? 'Unlock track' : 'Lock track'}
+					title={props.track.locked ? copy().unlockTrack : copy().lockTrack}
 				>
 					{props.track.locked ? (
 						<Lock size={12} aria-hidden="true" />
@@ -79,9 +84,12 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					type="button"
 					class={`track-control-button${!props.track.visible ? ' is-active' : ''}`}
 					onClick={() => props.onSetVisible(!props.track.visible)}
-					aria-label={props.track.visible ? `Hide ${props.track.id}` : `Show ${props.track.id}`}
+					aria-label={`${props.track.visible ? copy().hideX : copy().showX}`.replace(
+						'{x}',
+						props.track.id
+					)}
 					aria-pressed={!props.track.visible}
-					title={props.track.visible ? 'Hide track' : 'Show track'}
+					title={props.track.visible ? copy().hideTrack : copy().showTrack}
 				>
 					{props.track.visible ? (
 						<Eye size={12} aria-hidden="true" />
@@ -93,11 +101,12 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					type="button"
 					class={`track-control-button${props.track.syncLocked ? ' is-active' : ''}`}
 					onClick={() => props.onSetSyncLock(!props.track.syncLocked)}
-					aria-label={
-						props.track.syncLocked ? `Unsync ${props.track.id}` : `Sync-lock ${props.track.id}`
-					}
+					aria-label={`${props.track.syncLocked ? copy().unsyncX : copy().syncLockX}`.replace(
+						'{x}',
+						props.track.id
+					)}
 					aria-pressed={props.track.syncLocked}
-					title={props.track.syncLocked ? 'Disable sync lock' : 'Enable sync lock'}
+					title={props.track.syncLocked ? copy().disableSyncLock : copy().enableSyncLock}
 				>
 					<Link2 size={12} aria-hidden="true" />
 				</button>
@@ -105,11 +114,12 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					type="button"
 					class={`track-control-button${props.track.editTarget ? ' is-active' : ''}`}
 					onClick={() => props.onSetEditTarget(!props.track.editTarget)}
-					aria-label={
-						props.track.editTarget ? `Untarget ${props.track.id}` : `Target ${props.track.id}`
-					}
+					aria-label={`${props.track.editTarget ? copy().untargetX : copy().targetX}`.replace(
+						'{x}',
+						props.track.id
+					)}
 					aria-pressed={props.track.editTarget}
-					title={props.track.editTarget ? 'Disable edit target' : 'Enable edit target'}
+					title={props.track.editTarget ? copy().disableEditTarget : copy().enableEditTarget}
 				>
 					<Target size={12} aria-hidden="true" />
 				</button>
@@ -118,8 +128,8 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					class="track-control-button"
 					onClick={() => props.onMoveUp()}
 					disabled={props.index === 0}
-					aria-label={`Move ${props.track.id} up`}
-					title="Move track up"
+					aria-label={copy().moveXUp.replace('{x}', props.track.id)}
+					title={copy().moveTrackUp}
 				>
 					<ChevronUp size={12} aria-hidden="true" />
 				</button>
@@ -128,8 +138,8 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					class="track-control-button"
 					onClick={() => props.onMoveDown()}
 					disabled={props.index >= props.trackCount - 1}
-					aria-label={`Move ${props.track.id} down`}
-					title="Move track down"
+					aria-label={copy().moveXDown.replace('{x}', props.track.id)}
+					title={copy().moveTrackDown}
 				>
 					<ChevronDown size={12} aria-hidden="true" />
 				</button>
@@ -137,8 +147,8 @@ export function TimelineTrack(props: TimelineTrackProps) {
 					type="button"
 					class="track-control-button is-danger"
 					onClick={() => props.onRemove()}
-					aria-label={`Remove ${props.track.id}`}
-					title="Remove track"
+					aria-label={copy().removeX.replace('{x}', props.track.id)}
+					title={copy().removeTrack}
 				>
 					<Trash2 size={12} aria-hidden="true" />
 				</button>

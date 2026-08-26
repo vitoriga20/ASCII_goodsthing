@@ -26,6 +26,7 @@ import type { CaptionAnimStylePresetSnapshot } from '../protocol';
 import { isAbortError } from '../lib/abort-error';
 import { downloadBlob } from '../lib/blob-download';
 import { generateId } from '../utils/uuid';
+import { studioCopy, studioLocale } from './locale';
 
 // CaptionAnimStylePreset (engine) and CaptionAnimStylePresetSnapshot (protocol)
 // are structurally compatible — the protocol type relaxes the animation kind to
@@ -33,12 +34,32 @@ import { generateId } from '../utils/uuid';
 // shape from callers and produces it on outbound mutations.
 type UiPreset = CaptionAnimStylePresetSnapshot;
 
+type Copy = ReturnType<typeof studioCopy>;
+
 const ANIM_KINDS = ['none', 'pop', 'bounce', 'slide-up', 'slide-down', 'typewriter'] as const;
 type AnimKind = (typeof ANIM_KINDS)[number];
 
 /** Narrow a free-form string from a <select> onChange to a CaptionAnimKind. */
 function coerceAnimKind(value: string): AnimKind {
 	return (ANIM_KINDS as readonly string[]).includes(value) ? (value as AnimKind) : 'none';
+}
+
+/** Localized display label for an animation kind (option values stay identifiers). */
+function animKindLabel(c: Copy, kind: AnimKind): string {
+	switch (kind) {
+		case 'none':
+			return c.animNone;
+		case 'pop':
+			return c.animPop;
+		case 'bounce':
+			return c.animBounce;
+		case 'slide-up':
+			return c.animSlideUp;
+		case 'slide-down':
+			return c.animSlideDown;
+		case 'typewriter':
+			return c.animTypewriter;
+	}
 }
 
 /** Generate a unique preset ID via the centralized utility. */
@@ -125,6 +146,7 @@ export function serializeAndSavePreset(
 	const filename = `${safeStem}.caption-preset.json`;
 
 	if (typeof (globalThis as Record<string, unknown>).showSaveFilePicker === 'function') {
+		const fileDescription = studioCopy(studioLocale()).captionPresetFileDescription;
 		void (async () => {
 			try {
 				const handle = await (
@@ -135,7 +157,7 @@ export function serializeAndSavePreset(
 					suggestedName: filename,
 					types: [
 						{
-							description: 'Caption preset',
+							description: fileDescription,
 							accept: { 'application/json': ['.json'] }
 						}
 					]
@@ -179,7 +201,7 @@ export async function openAndImportPreset(): Promise<
 			).showOpenFilePicker({
 				types: [
 					{
-						description: 'Caption preset',
+						description: studioCopy(studioLocale()).captionPresetFileDescription,
 						accept: { 'application/json': ['.json'] }
 					}
 				],
@@ -221,9 +243,12 @@ function readAndValidate(
 ): void {
 	// R4.6: bounded memory — reject oversized files before reading them into memory.
 	if (file.size > MAX_PRESET_FILE_BYTES) {
+		const c = studioCopy(studioLocale());
 		resolve({
 			ok: false,
-			error: `Preset file exceeds ${Math.round(MAX_PRESET_FILE_BYTES / 1024)} KiB limit (got ${Math.round(file.size / 1024)} KiB).`
+			error: c.presetTooLarge
+				.replace('{limit}', String(Math.round(MAX_PRESET_FILE_BYTES / 1024)))
+				.replace('{actual}', String(Math.round(file.size / 1024)))
 		});
 		return;
 	}
@@ -233,9 +258,12 @@ function readAndValidate(
 			const raw = JSON.parse(reader.result as string);
 			const result = validateCaptionAnimPreset(raw);
 			if (!result.ok) {
+				const c = studioCopy(studioLocale());
 				resolve({
 					ok: false,
-					error: `Invalid field: ${result.field} — ${result.message}`
+					error: c.presetInvalidField
+						.replace('{field}', result.field)
+						.replace('{message}', result.message)
 				});
 				return;
 			}
@@ -246,10 +274,10 @@ function readAndValidate(
 			};
 			resolve({ ok: true, preset });
 		} catch {
-			resolve({ ok: false, error: 'File is not valid JSON.' });
+			resolve({ ok: false, error: studioCopy(studioLocale()).presetNotJson });
 		}
 	};
-	reader.onerror = () => resolve({ ok: false, error: 'Failed to read file.' });
+	reader.onerror = () => resolve({ ok: false, error: studioCopy(studioLocale()).presetReadFailed });
 	reader.readAsText(file);
 }
 
@@ -385,6 +413,7 @@ function presetFromDraft(label: string, base: UiPreset, draft: Draft): UiPreset 
 
 /** The preset picker and override panel. */
 export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [importError, setImportError] = createSignal<string | null>(null);
 	const [importSuccess, setImportSuccessSignal] = createSignal<string | null>(null);
 	const [importConflict, setImportConflict] = createSignal<{
@@ -455,7 +484,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 			return;
 		}
 		props.onImportPreset(incoming);
-		setImportSuccess(`Imported: ${incoming.label}`);
+		setImportSuccess(copy().importedPreset.replace('{name}', incoming.label));
 	};
 
 	const handleImportConflictUpdate = () => {
@@ -463,15 +492,17 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 		if (!c) return;
 		setImportConflict(null);
 		props.onImportPreset({ ...c.preset, id: c.conflictId });
-		setImportSuccess(`Updated: ${c.label}`);
+		setImportSuccess(copy().updatedPreset.replace('{name}', c.label));
 	};
 
 	const handleImportConflictCopy = () => {
 		const c = importConflict();
 		if (!c) return;
 		setImportConflict(null);
-		props.onImportPreset({ ...c.preset, label: c.preset.label + ' (copy)' });
-		setImportSuccess(`Imported as copy: ${c.preset.label} (copy)`);
+		props.onImportPreset({ ...c.preset, label: c.preset.label + copy().copySuffix });
+		setImportSuccess(
+			copy().importedAsCopy.replace('{name}', c.preset.label).replace('{copy}', copy().copySuffix)
+		);
 	};
 
 	const handleImportConflictCancel = () => {
@@ -482,7 +513,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 		const base = activePreset();
 		if (!base) return;
 		setPresetNamePrompt({
-			label: `${base.label} (custom)`,
+			label: `${base.label}${copy().customSuffix}`,
 			base,
 			draft: d()
 		});
@@ -497,7 +528,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 		props.onImportPreset(newPreset);
 		// Switch the selection to the new preset so further edits land on it.
 		props.onSetPresetId(newPreset.id);
-		setImportSuccess(`Saved as preset: ${newPreset.label}`);
+		setImportSuccess(copy().savedAsPreset.replace('{name}', newPreset.label));
 		setPresetNamePrompt(null);
 	};
 
@@ -509,7 +540,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 		const preset = activePreset();
 		if (!preset) return;
 		serializeAndSavePreset(preset, (message) =>
-			setImportError(`Could not save preset: ${message}`)
+			setImportError(copy().presetSaveFailed.replace('{message}', message))
 		);
 	};
 
@@ -521,9 +552,9 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 	});
 
 	return (
-		<div class="caption-style-inspector" role="group" aria-label="Caption animation style">
+		<div class="caption-style-inspector" role="group" aria-label={copy().captionAnimStyle}>
 			{/* Preset picker grid */}
-			<div class="caption-preset-grid" role="listbox" aria-label="Caption presets">
+			<div class="caption-preset-grid" role="listbox" aria-label={copy().captionPresets}>
 				<For each={allPresets()}>
 					{(preset) => (
 						<button
@@ -537,17 +568,29 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 							<span class="caption-preset-swatch-label">{preset.label}</span>
 							<span class="caption-preset-badges">
 								{preset.glow && (
-									<span class="caption-preset-badge" aria-label="Has glow" title="Glow">
+									<span
+										class="caption-preset-badge"
+										aria-label={copy().badgeHasGlow}
+										title={copy().badgeGlow}
+									>
 										G
 									</span>
 								)}
 								{preset.pill && (
-									<span class="caption-preset-badge" aria-label="Has pill" title="Pill">
+									<span
+										class="caption-preset-badge"
+										aria-label={copy().badgeHasPill}
+										title={copy().badgePill}
+									>
 										P
 									</span>
 								)}
 								{preset.animation && preset.animation.enter !== 'none' && (
-									<span class="caption-preset-badge" aria-label="Animated" title="Animated">
+									<span
+										class="caption-preset-badge"
+										aria-label={copy().badgeAnimated}
+										title={copy().badgeAnimated}
+									>
 										A
 									</span>
 								)}
@@ -559,47 +602,47 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 
 			{/* Per-field override form. Edits stay local until "Save as preset" is
 			    pressed, which materialises a new custom preset and selects it. */}
-			<div class="caption-overrides" role="group" aria-label="Preset overrides">
+			<div class="caption-overrides" role="group" aria-label={copy().presetOverrides}>
 				<div class="caption-overrides-row">
 					<label>
-						<span>Text color</span>
+						<span>{copy().textColor}</span>
 						<input
 							type="color"
 							value={d().color}
-							aria-label="Text color"
+							aria-label={copy().textColor}
 							onInput={(e) => updateDraft('color', e.currentTarget.value)}
 						/>
 					</label>
 					<label>
-						<span>Font size (px)</span>
+						<span>{copy().fontSizePx}</span>
 						<input
 							type="number"
 							min="16"
 							max="200"
 							step="1"
 							value={d().fontSizePx}
-							aria-label="Font size in pixels"
+							aria-label={copy().fontSizePxAria}
 							onInput={(e) => updateDraft('fontSizePx', Number(e.currentTarget.value))}
 						/>
 					</label>
 					<label>
-						<span>Outline color</span>
+						<span>{copy().outlineColor}</span>
 						<input
 							type="color"
 							value={d().outlineColor}
-							aria-label="Outline color"
+							aria-label={copy().outlineColor}
 							onInput={(e) => updateDraft('outlineColor', e.currentTarget.value)}
 						/>
 					</label>
 					<label>
-						<span>Outline width (px)</span>
+						<span>{copy().outlineWidthPx}</span>
 						<input
 							type="number"
 							min="0"
 							max="32"
 							step="1"
 							value={d().outlineWidthPx}
-							aria-label="Outline width in pixels"
+							aria-label={copy().outlineWidthPxAria}
 							onInput={(e) => updateDraft('outlineWidthPx', Number(e.currentTarget.value))}
 						/>
 					</label>
@@ -610,23 +653,23 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 						<input
 							type="checkbox"
 							checked={d().glowEnabled}
-							aria-label="Enable glow"
+							aria-label={copy().enableGlow}
 							onChange={(e) => updateDraft('glowEnabled', e.currentTarget.checked)}
 						/>
-						<span>Glow</span>
+						<span>{copy().glowLabel}</span>
 					</label>
 					<label>
-						<span>Glow color</span>
+						<span>{copy().glowColor}</span>
 						<input
 							type="color"
 							value={d().glowColor}
 							disabled={!d().glowEnabled}
-							aria-label="Glow color"
+							aria-label={copy().glowColor}
 							onInput={(e) => updateDraft('glowColor', e.currentTarget.value)}
 						/>
 					</label>
 					<label>
-						<span>Glow blur (px)</span>
+						<span>{copy().glowBlurPx}</span>
 						<input
 							type="number"
 							min="0"
@@ -634,7 +677,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 							step="1"
 							value={d().glowBlurPx}
 							disabled={!d().glowEnabled}
-							aria-label="Glow blur radius in pixels"
+							aria-label={copy().glowBlurPxAria}
 							onInput={(e) => updateDraft('glowBlurPx', Number(e.currentTarget.value))}
 						/>
 					</label>
@@ -645,23 +688,23 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 						<input
 							type="checkbox"
 							checked={d().pillEnabled}
-							aria-label="Enable background pill"
+							aria-label={copy().enablePill}
 							onChange={(e) => updateDraft('pillEnabled', e.currentTarget.checked)}
 						/>
-						<span>Pill</span>
+						<span>{copy().pillLabel}</span>
 					</label>
 					<label>
-						<span>Pill color</span>
+						<span>{copy().pillColor}</span>
 						<input
 							type="color"
 							value={d().pillColor}
 							disabled={!d().pillEnabled}
-							aria-label="Pill color"
+							aria-label={copy().pillColor}
 							onInput={(e) => updateDraft('pillColor', e.currentTarget.value)}
 						/>
 					</label>
 					<label>
-						<span>Pill opacity</span>
+						<span>{copy().pillOpacity}</span>
 						<input
 							type="number"
 							min="0"
@@ -669,12 +712,12 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 							step="0.05"
 							value={d().pillOpacity}
 							disabled={!d().pillEnabled}
-							aria-label="Pill opacity"
+							aria-label={copy().pillOpacity}
 							onInput={(e) => updateDraft('pillOpacity', Number(e.currentTarget.value))}
 						/>
 					</label>
 					<label>
-						<span>Pill radius (px)</span>
+						<span>{copy().pillRadiusPx}</span>
 						<input
 							type="number"
 							min="0"
@@ -682,7 +725,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 							step="1"
 							value={d().pillRadiusPx}
 							disabled={!d().pillEnabled}
-							aria-label="Pill corner radius"
+							aria-label={copy().pillRadiusPxAria}
 							onInput={(e) => updateDraft('pillRadiusPx', Number(e.currentTarget.value))}
 						/>
 					</label>
@@ -690,34 +733,38 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 
 				<div class="caption-overrides-row">
 					<label>
-						<span>Enter animation</span>
+						<span>{copy().enterAnimation}</span>
 						<select
 							value={d().enterKind}
-							aria-label="Enter animation kind"
+							aria-label={copy().enterAnimationAria}
 							onChange={(e) => updateDraft('enterKind', coerceAnimKind(e.currentTarget.value))}
 						>
-							<For each={ANIM_KINDS}>{(kind) => <option value={kind}>{kind}</option>}</For>
+							<For each={ANIM_KINDS}>
+								{(kind) => <option value={kind}>{animKindLabel(copy(), kind)}</option>}
+							</For>
 						</select>
 					</label>
 					<label>
-						<span>Exit animation</span>
+						<span>{copy().exitAnimation}</span>
 						<select
 							value={d().exitKind}
-							aria-label="Exit animation kind"
+							aria-label={copy().exitAnimationAria}
 							onChange={(e) => updateDraft('exitKind', coerceAnimKind(e.currentTarget.value))}
 						>
-							<For each={ANIM_KINDS}>{(kind) => <option value={kind}>{kind}</option>}</For>
+							<For each={ANIM_KINDS}>
+								{(kind) => <option value={kind}>{animKindLabel(copy(), kind)}</option>}
+							</For>
 						</select>
 					</label>
 					<label>
-						<span>Duration (s)</span>
+						<span>{copy().animDurationS}</span>
 						<input
 							type="number"
 							min="0.05"
 							max="1"
 							step="0.05"
 							value={d().animDurationS}
-							aria-label="Animation duration in seconds"
+							aria-label={copy().animDurationSAria}
 							onInput={(e) => updateDraft('animDurationS', Number(e.currentTarget.value))}
 						/>
 					</label>
@@ -726,33 +773,33 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 
 			{/* Import/Export buttons */}
 			<div class="caption-preset-actions">
-				<button type="button" onClick={handleImport} aria-label="Import preset from file">
-					Import…
+				<button type="button" onClick={handleImport} aria-label={copy().importPresetAria}>
+					{copy().importEllipsis}
 				</button>
 				<button
 					type="button"
 					onClick={handleExport}
-					aria-label="Export preset to file"
+					aria-label={copy().exportPresetAria}
 					disabled={!activePreset()}
 				>
-					Export
+					{copy().export}
 				</button>
 				<button
 					type="button"
 					onClick={handleSaveAsPreset}
-					aria-label="Save current overrides as a new preset"
+					aria-label={copy().savePresetAria}
 					disabled={!activePreset()}
 				>
-					Save as preset…
+					{copy().saveAsPreset}
 				</button>
 				{/* Delete is only valid for custom presets — built-ins are immutable. */}
 				<Show when={isCustomSelected()}>
 					<button
 						type="button"
 						onClick={() => props.onDeletePreset(props.presetId)}
-						aria-label="Delete custom preset"
+						aria-label={copy().deleteCustomPreset}
 					>
-						Delete
+						{copy().delete}
 					</button>
 				</Show>
 			</div>
@@ -786,20 +833,20 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 						onDismiss={handleImportConflictCancel}
 					>
 						<h2 id="caption-conflict-title" class="caption-preset-dialog-title">
-							Preset already exists
+							{copy().presetExistsTitle}
 						</h2>
 						<p id="caption-conflict-description">
-							A preset named <strong>{c().label}</strong> already exists.
+							{copy().presetExistsBody.replace('{name}', c().label)}
 						</p>
 						<div class="caption-notice-actions">
 							<button type="button" data-caption-dialog-cancel onClick={handleImportConflictCancel}>
-								Cancel
+								{copy().cancel}
 							</button>
 							<button type="button" class="is-destructive" onClick={handleImportConflictUpdate}>
-								Update existing
+								{copy().updateExisting}
 							</button>
 							<button type="button" class="is-primary" onClick={handleImportConflictCopy}>
-								Save as copy
+								{copy().saveAsCopy}
 							</button>
 						</div>
 					</CaptionPresetDialog>
@@ -815,15 +862,15 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 					onDismiss={handleCancelPresetName}
 				>
 					<h2 id="caption-preset-name-title" class="caption-preset-dialog-title">
-						Save caption preset
+						{copy().saveCaptionPreset}
 					</h2>
-					<p id="caption-preset-name-description">Choose a name for these style settings.</p>
+					<p id="caption-preset-name-description">{copy().choosePresetName}</p>
 					<label>
-						<span>Preset name</span>
+						<span>{copy().presetNameField}</span>
 						<input
 							type="text"
 							value={presetNamePrompt()?.label ?? ''}
-							aria-label="Preset name"
+							aria-label={copy().presetNameField}
 							onInput={(event) =>
 								setPresetNamePrompt((prompt) =>
 									prompt ? { ...prompt, label: event.currentTarget.value } : prompt
@@ -839,7 +886,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 					</label>
 					<div class="caption-notice-actions">
 						<button type="button" onClick={handleCancelPresetName}>
-							Cancel
+							{copy().cancel}
 						</button>
 						<button
 							type="button"
@@ -847,7 +894,7 @@ export function CaptionStyleInspector(props: CaptionStyleInspectorProps) {
 							disabled={!presetNamePrompt()?.label.trim()}
 							onClick={handleCommitPresetName}
 						>
-							Save
+							{copy().saveLabel}
 						</button>
 					</div>
 				</CaptionPresetDialog>

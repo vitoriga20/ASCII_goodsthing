@@ -132,7 +132,6 @@ function formatToolbarDuration(seconds: number): string {
 export function Toolbar(props: ToolbarProps) {
 	const activeLocale = () => props.locale?.() ?? 'en';
 	const copy = () => studioCopy(activeLocale());
-	const menuLabel = (label: string) => ({ Project: copy().project, Edit: copy().edit, View: copy().view, Clip: copy().clip, Timeline: copy().timeline, Help: copy().help }[label] ?? label);
 	const hasVideo = () => props.metadata?.video != null;
 	const transportDisabled = () => props.transportDisabled || !hasVideo();
 	const [commandOpen, setCommandOpen] = createSignal(false);
@@ -179,12 +178,13 @@ export function Toolbar(props: ToolbarProps) {
 	});
 	const sourceFormatLabel = () => {
 		const video = props.metadata?.video;
-		if (!video) return 'Nothing loaded';
-		const fps = video.frameRate ? `${Math.round(video.frameRate)} FPS` : 'FPS ?';
+		if (!video) return copy().nothingLoaded;
+		const fps = video.frameRate ? `${Math.round(video.frameRate)} FPS` : copy().fpsUnknown;
 		return `${video.width}×${video.height} · ${fps}`;
 	};
 	const commandActions = createMemo<CommandAction[]>(() =>
 		buildCommandActions({
+			locale: activeLocale(),
 			importHint: props.importHint,
 			importBlocked: props.importBlocked ?? false,
 			playing: props.playing(),
@@ -224,6 +224,7 @@ export function Toolbar(props: ToolbarProps) {
 	const glyphs = modifierGlyphs();
 	const menuBarGroups = createMemo<MenuBarGroup[]>(() =>
 		buildMenuBarGroups({
+			locale: activeLocale(),
 			glyphs,
 			importBlocked: props.importBlocked ?? false,
 			canUndo: props.canUndo,
@@ -285,21 +286,24 @@ export function Toolbar(props: ToolbarProps) {
 					<span class="app-glyph" aria-hidden="true">
 						<Crosshair size={20} strokeWidth={1.6} />
 					</span>
-					<div class="app-brand-copy">
-						<h1 class="app-title">LocalCut Studio</h1>
-						<span class="app-kicker">Client NLE</span>
+<div class="app-brand-copy">
+							<h1 class="app-title">LocalCut Studio</h1>
+							<span class="app-kicker">{copy().clientNLE}</span>
+						</div>
 					</div>
-				</div>
-				<nav class="toolbar-menu-nav" aria-label={copy().settings}>
-					<For each={menuBarGroups()}>
-						{(group) => (
-							<Menu.Root
-								onSelect={(details) => runMenuItem(group, details.value)}
-								positioning={{ placement: 'bottom-start', gutter: 6 }}
-							>
-								<Menu.Trigger class="toolbar-menu-item" title={`Open ${menuLabel(group.label)} menu`}>
-									{menuLabel(group.label)}
-								</Menu.Trigger>
+					<nav class="toolbar-menu-nav" aria-label={copy().settings}>
+						<For each={menuBarGroups()}>
+							{(group) => (
+								<Menu.Root
+									onSelect={(details) => runMenuItem(group, details.value)}
+									positioning={{ placement: 'bottom-start', gutter: 6 }}
+								>
+									<Menu.Trigger
+										class="toolbar-menu-item"
+										title={copy().openMenu.replace('{n}', group.label)}
+									>
+										{group.label}
+									</Menu.Trigger>
 								<Portal>
 									<Menu.Positioner>
 										<Menu.Content class="command-popover panel toolbar-menu-popover">
@@ -333,19 +337,19 @@ export function Toolbar(props: ToolbarProps) {
 					onOpenChange={(details) => setCommandOpen(details.open)}
 					positioning={{ placement: 'bottom-end', gutter: 8 }}
 				>
-					<Popover.Trigger class="command-search" aria-label="Search actions">
-						<Search size={13} aria-hidden="true" />
-						<span>{copy().searchActions}</span>
-						<kbd>{glyphs.mod}</kbd>
-						<kbd>K</kbd>
-					</Popover.Trigger>
-					<Portal>
-						<Popover.Positioner>
-							<Popover.Content class="command-popover" aria-label="Command palette">
-								<header class="command-popover-header">
-									<Command size={14} aria-hidden="true" />
-									<span>Command palette</span>
-								</header>
+<Popover.Trigger class="command-search" aria-label={copy().searchActionsLabel}>
+							<Search size={13} aria-hidden="true" />
+							<span>{copy().searchActions}</span>
+							<kbd>{glyphs.mod}</kbd>
+							<kbd>K</kbd>
+						</Popover.Trigger>
+						<Portal>
+							<Popover.Positioner>
+								<Popover.Content class="command-popover" aria-label={copy().commandPalette}>
+									<header class="command-popover-header">
+										<Command size={14} aria-hidden="true" />
+										<span>{copy().commandPalette}</span>
+									</header>
 								<ul class="command-list">
 									<For each={commandActions()}>
 										{(action) => (
@@ -377,9 +381,9 @@ export function Toolbar(props: ToolbarProps) {
 						disabled={props.importBlocked}
 						title={props.importHint ?? undefined}
 					>
-						<FolderOpen size={14} aria-hidden="true" />
-						Import
-					</Button>
+<FolderOpen size={14} aria-hidden="true" />
+							{copy().import}
+						</Button>
 					<input
 						ref={(el) => {
 							importInput = el;
@@ -399,122 +403,118 @@ export function Toolbar(props: ToolbarProps) {
 						class="file-name"
 						title={props.metadata?.fileName ?? copy().dropToStart}
 					>
-						<Show when={props.metadata} fallback="Drop or import a file to get started">
+						<Show when={props.metadata} fallback={copy().dropToStart}>
 							{(meta) => meta().fileName}
 						</Show>
 					</span>
 					<span class="source-format">{sourceFormatLabel()}</span>
 				</div>
 				<div class="toolbar-right">
-					<div class="edit-controls" role="group" aria-label="Edit history">
-						<Button
-							size="icon"
-							onClick={() => props.onUndo()}
-							disabled={!props.canUndo}
-							aria-label="Undo"
-							title={`Undo (${glyphs.mod}+Z)`}
-						>
-							<Undo2 size={14} aria-hidden="true" />
-						</Button>
-						<Button
-							size="icon"
-							onClick={() => props.onRedo()}
-							disabled={!props.canRedo}
-							aria-label="Redo"
-							title={`Redo (${glyphs.mod}+${glyphs.shift}+Z)`}
-						>
-							<Redo2 size={14} aria-hidden="true" />
-						</Button>
-					</div>
-					<div class="transport-controls" role="group" aria-label="Transport">
-						<Button
-							size="icon"
-							onClick={() => props.onStep(-1)}
-							disabled={transportDisabled()}
-							aria-label="Step back one frame"
-							title="Step back one frame (J)"
-						>
-							<SkipBack size={14} aria-hidden="true" />
-						</Button>
-						<Button
-							class="transport-play"
-							onClick={() => props.onPlay()}
-							disabled={transportDisabled() || props.playing()}
-							aria-label="Play transport"
-							title="Play transport (L)"
-						>
-							<Play size={14} aria-hidden="true" />
-							Play
-						</Button>
-						<Button
-							onClick={() => props.onPause()}
-							disabled={transportDisabled() || !props.playing()}
-							aria-label="Pause transport"
-							title="Pause transport (K)"
-						>
-							<Pause size={14} aria-hidden="true" />
-							Pause
-						</Button>
-						<Button
-							size="icon"
-							onClick={() => props.onStep(1)}
-							disabled={transportDisabled()}
-							aria-label="Step forward one frame"
-							title="Step forward one frame"
-						>
-							<SkipForward size={14} aria-hidden="true" />
-						</Button>
-						<Button
-							size="icon"
-							variant={props.loop() ? 'default' : 'secondary'}
-							onClick={() => props.onToggleLoop()}
-							disabled={transportDisabled()}
-							aria-label="Loop playback"
-							aria-pressed={props.loop()}
-							title={
-								props.loop() ? 'Loop: on (replays at the end)' : 'Loop: off (stops at the end)'
-							}
-						>
-							<Repeat size={14} aria-hidden="true" />
-						</Button>
-					</div>
-					<div class="toolbar-timecode" aria-label="Playback timecode">
+<div class="edit-controls" role="group" aria-label={copy().editHistory}>
+							<Button
+								size="icon"
+								onClick={() => props.onUndo()}
+								disabled={!props.canUndo}
+								aria-label={copy().undo}
+								title={copy().undoKbd.replace('{n}', `${glyphs.mod}+Z`)}
+							>
+								<Undo2 size={14} aria-hidden="true" />
+							</Button>
+							<Button
+								size="icon"
+								onClick={() => props.onRedo()}
+								disabled={!props.canRedo}
+								aria-label={copy().redo}
+								title={copy().redoKbd.replace('{n}', `${glyphs.mod}+${glyphs.shift}+Z`)}
+							>
+								<Redo2 size={14} aria-hidden="true" />
+							</Button>
+						</div>
+						<div class="transport-controls" role="group" aria-label={copy().transport}>
+							<Button
+								size="icon"
+								onClick={() => props.onStep(-1)}
+								disabled={transportDisabled()}
+								aria-label={copy().stepBackFrame}
+								title={copy().stepBackFrameKbd.replace('{n}', 'J')}
+							>
+								<SkipBack size={14} aria-hidden="true" />
+							</Button>
+							<Button
+								class="transport-play"
+								onClick={() => props.onPlay()}
+								disabled={transportDisabled() || props.playing()}
+								aria-label={copy().playTransport}
+								title={copy().playTransportKbd.replace('{n}', 'L')}
+							>
+								<Play size={14} aria-hidden="true" />
+								{copy().play}
+							</Button>
+							<Button
+								onClick={() => props.onPause()}
+								disabled={transportDisabled() || !props.playing()}
+								aria-label={copy().pauseTransport}
+								title={copy().pauseTransportKbd.replace('{n}', 'K')}
+							>
+								<Pause size={14} aria-hidden="true" />
+								{copy().pause}
+							</Button>
+							<Button
+								size="icon"
+								onClick={() => props.onStep(1)}
+								disabled={transportDisabled()}
+								aria-label={copy().stepForwardFrame}
+								title={copy().stepForwardFrame}
+							>
+								<SkipForward size={14} aria-hidden="true" />
+							</Button>
+							<Button
+								size="icon"
+								variant={props.loop() ? 'default' : 'secondary'}
+								onClick={() => props.onToggleLoop()}
+								disabled={transportDisabled()}
+								aria-label={copy().loopPlayback}
+								aria-pressed={props.loop()}
+								title={props.loop() ? copy().loopOn : copy().loopOff}
+							>
+								<Repeat size={14} aria-hidden="true" />
+							</Button>
+						</div>
+						<div class="toolbar-timecode" aria-label={copy().playbackTimecode}>
 						<span>
 							{formatToolbarTimecode(props.currentTime(), props.metadata?.video?.frameRate ?? null)}
 						</span>
 						<small>/</small>
 						<span>{formatToolbarDuration(props.duration())}</span>
 					</div>
-					<ToggleGroup.Root
-						class="timeline-toggles"
-						value={timelineModeValues()}
-						multiple
-						aria-label="Timeline snapping modes"
-						onValueChange={setTimelineModeValues}
-					>
-						<ToggleGroup.Item
-							value="snap"
-							class="timeline-toggle-status"
-							aria-label="Toggle timeline snapping"
-							title="Toggle timeline snapping"
+<ToggleGroup.Root
+							class="timeline-toggles"
+							value={timelineModeValues()}
+							multiple
+							aria-label={copy().timelineSnapModes}
+							onValueChange={setTimelineModeValues}
 						>
-							Snap
-						</ToggleGroup.Item>
-						<ToggleGroup.Item
-							value="beat"
-							class="timeline-toggle-status"
-							disabled={!props.timelineSnapEnabled}
-							aria-label="Toggle beat-grid snapping"
-							title={
-								props.timelineSnapEnabled
-									? 'Toggle beat-grid snapping'
-									: 'Enable snapping before beat-grid snapping'
-							}
-						>
-							Beat
-						</ToggleGroup.Item>
-					</ToggleGroup.Root>
-					<div class="master-mix" role="group" aria-label="Master mix">
+							<ToggleGroup.Item
+								value="snap"
+								class="timeline-toggle-status"
+								aria-label={copy().toggleTimelineSnap}
+								title={copy().toggleTimelineSnap}
+							>
+								{copy().snap}
+							</ToggleGroup.Item>
+							<ToggleGroup.Item
+								value="beat"
+								class="timeline-toggle-status"
+								disabled={!props.timelineSnapEnabled}
+								aria-label={copy().toggleBeatSnap}
+								title={
+									props.timelineSnapEnabled ? copy().toggleBeatSnap : copy().enableSnapFirst
+								}
+							>
+								{copy().beat}
+							</ToggleGroup.Item>
+						</ToggleGroup.Root>
+						<div class="master-mix" role="group" aria-label={copy().masterMix}>
 						<MeterStrip meterSab={props.meterSab} />
 						<label class="master-fader">
 							<span class="master-fader-label">{copy().master}</span>
@@ -541,27 +541,27 @@ export function Toolbar(props: ToolbarProps) {
 					{props.exportControl}
 				</div>
 			</div>
-			<div class="pipeline-strip" aria-label="Pipeline status">
-				<span
-					class={cn(
-						'pipeline-chip',
-						props.pipelineMode === 'accelerated' && 'is-ok',
-						props.pipelineMode === 'limited' && 'is-warn',
-						props.pipelineMode === 'starting' && 'is-waiting',
-						props.pipelineMode === 'blocked' && 'is-warn'
-					)}
-				>
-					<Gauge size={11} aria-hidden="true" />
-					{activeLocale() === 'zh-CN' && props.pipelineLabel === 'Accelerated' ? copy().accelerated : props.pipelineLabel}
-				</span>
-				<span class="pipeline-chip">
-					<Cpu size={11} aria-hidden="true" />
-					Client
-				</span>
-				<span class={cn('pipeline-chip', props.crossOriginIsolated ? 'is-ok' : 'is-warn')}>
-					<ShieldCheck size={11} aria-hidden="true" />
-					{props.crossOriginIsolated ? 'COOP/COEP' : 'No isolation'}
-				</span>
+<div class="pipeline-strip" aria-label={copy().pipelineStatus}>
+					<span
+						class={cn(
+							'pipeline-chip',
+							props.pipelineMode === 'accelerated' && 'is-ok',
+							props.pipelineMode === 'limited' && 'is-warn',
+							props.pipelineMode === 'starting' && 'is-waiting',
+							props.pipelineMode === 'blocked' && 'is-warn'
+						)}
+					>
+						<Gauge size={11} aria-hidden="true" />
+						{activeLocale() === 'zh-CN' && props.pipelineLabel === 'Accelerated' ? copy().accelerated : props.pipelineLabel}
+					</span>
+					<span class="pipeline-chip">
+						<Cpu size={11} aria-hidden="true" />
+						{copy().client}
+					</span>
+					<span class={cn('pipeline-chip', props.crossOriginIsolated ? 'is-ok' : 'is-warn')}>
+						<ShieldCheck size={11} aria-hidden="true" />
+						{props.crossOriginIsolated ? 'COOP/COEP' : copy().noIsolation}
+					</span>
 				<Show when={props.previewLabel !== null}>
 					<span class="pipeline-chip">
 						<Activity size={11} aria-hidden="true" />
@@ -575,15 +575,15 @@ export function Toolbar(props: ToolbarProps) {
 					</span>
 				</Show>
 				<span class="pipeline-tools-divider" aria-hidden="true" />
-				<button
-					type="button"
-					class={cn('pipeline-chip pipeline-chip-button is-tool', props.publishLive && 'is-live')}
-					onClick={() => props.onOpenPublish?.()}
-					title="Go live — stream to a WHIP endpoint"
-				>
-					<Radio size={11} aria-hidden="true" />
-					{props.publishLive ? 'Live' : copy().goLive}
-				</button>
+<button
+						type="button"
+						class={cn('pipeline-chip pipeline-chip-button is-tool', props.publishLive && 'is-live')}
+						onClick={() => props.onOpenPublish?.()}
+						title={copy().goLiveTitle}
+					>
+						<Radio size={11} aria-hidden="true" />
+						{props.publishLive ? copy().publishLive : copy().goLive}
+					</button>
 				{/*
 				 * IA-T1/D13: the launcher strip is collapsed to frequent + contextual
 				 * tools only. Audio Cleanup, Captions, Translate, Reframe, and Silence
@@ -592,15 +592,15 @@ export function Toolbar(props: ToolbarProps) {
 				 */}
 				{props.calloutTool}
 				<Show when={props.keystrokeOverlayAvailable}>
-					<button
-						type="button"
-						class="pipeline-chip pipeline-chip-button is-tool"
-						onClick={() => props.onImportKeystrokeOverlay?.()}
-						title="Show keyboard shortcuts on the preview"
-					>
-						<Keyboard size={11} aria-hidden="true" />
-						Keys
-					</button>
+<button
+							type="button"
+							class="pipeline-chip pipeline-chip-button is-tool"
+							onClick={() => props.onImportKeystrokeOverlay?.()}
+							title={copy().showKeysTitle}
+						>
+							<Keyboard size={11} aria-hidden="true" />
+							{copy().keys}
+						</button>
 				</Show>
 			</div>
 		</header>

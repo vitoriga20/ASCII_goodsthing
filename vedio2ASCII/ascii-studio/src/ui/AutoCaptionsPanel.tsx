@@ -11,11 +11,11 @@ import { X } from 'lucide-solid';
 import { Button } from './components/button';
 import { ASR_ACCURACY_NOTE, ASR_UNAVAILABLE_MESSAGE } from '../engine/asr/asr-probe';
 import {
-	ASR_PRIVACY_STATEMENT,
 	asrActionAvailability,
 	type AsrClipTarget,
 	type AsrControllerState
 } from './asr-controller';
+import { studioCopy, studioLocale } from './locale';
 
 export interface AutoCaptionsPanelProps {
 	open: boolean;
@@ -31,6 +31,8 @@ export interface AutoCaptionsPanelProps {
 
 type ActiveAsrJob = NonNullable<AsrControllerState['job']>;
 
+type Copy = ReturnType<typeof studioCopy>;
+
 function formatBytes(bytes: number | null): string {
 	if (bytes === null) return '—';
 	if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -44,13 +46,13 @@ function formatDuration(ms: number | null): string {
 	return `${(ms / 1000).toFixed(2)} s`;
 }
 
-function formatLanguage(lang: string | null): string {
-	if (!lang) return 'Auto-detect';
+function formatLanguage(c: Copy, lang: string | null): string {
+	if (!lang) return c.autoDetect;
 	switch (lang) {
 		case 'zh':
-			return 'Chinese (zh)';
+			return c.languageChinese;
 		case 'en':
-			return 'English (en)';
+			return c.languageEnglish;
 		default:
 			return lang;
 	}
@@ -64,19 +66,20 @@ function formatProgressPercent(value: number | null | undefined): string {
 	return `${Math.round(clampFraction(value) * 100)}%`;
 }
 
-function asrJobLabel(job: ActiveAsrJob): string {
+function asrJobLabel(c: Copy, job: ActiveAsrJob): string {
 	switch (job.phase) {
 		case 'extracting':
-			return 'Preparing audio';
+			return c.asrJobExtracting;
 		case 'creating-track':
-			return 'Creating caption track';
+			return c.asrJobCreatingTrack;
 		case 'transcribing':
-			return 'Transcribing audio';
+			return c.asrJobTranscribing;
 	}
 }
 
 export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 	let panelRef: HTMLElement | undefined;
+	const copy = () => studioCopy(studioLocale());
 	const [language, setLanguage] = createSignal<string>('en');
 
 	createEffect(() => {
@@ -87,7 +90,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 
 	const availability = () => asrActionAvailability(props.state, props.selectedClip);
 	const engineLabel = () => {
-		if (props.state.recommendedEngine !== 'ort-whisper') return 'Unavailable';
+		if (props.state.recommendedEngine !== 'ort-whisper') return copy().engineUnavailable;
 		const accel = props.state.accelerator ?? 'wasm';
 		return `ONNX Whisper (${accel.toUpperCase()})`;
 	};
@@ -99,11 +102,13 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 		props.state.downloadedBytes >= props.state.modelSizeBytes;
 	const modelProgressLabel = () =>
 		isCompilingModel()
-			? `Compiling ${props.state.model.name}`
-			: `Downloading ${props.state.model.name}`;
+			? copy().modelCompiling.replace('{name}', props.state.model.name)
+			: copy().modelDownloading.replace('{name}', props.state.model.name);
 	const modelProgressMeta = () =>
 		isCompilingModel()
-			? `Verified ${formatBytes(props.state.modelSizeBytes)} · compiling ${engineLabel()}`
+			? copy()
+					.modelVerifiedCompiling.replace('{size}', formatBytes(props.state.modelSizeBytes))
+					.replace('{engine}', engineLabel())
 			: `${formatBytes(props.state.downloadedBytes)} / ${formatBytes(props.state.modelSizeBytes)}`;
 
 	return (
@@ -123,16 +128,16 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="auto-captions-panel-title">
-							Auto Captions (Experimental)
+							{copy().autoCaptionsPanelTitle}
 						</p>
-						<p class="capability-panel-tier">{ASR_PRIVACY_STATEMENT}</p>
+						<p class="capability-panel-tier">{copy().asrPrivacyStatement}</p>
 					</div>
 					<Button
 						size="icon"
 						variant="ghost"
 						onClick={props.onClose}
-						aria-label="Close auto captions panel"
-						title="Close auto captions panel"
+						aria-label={copy().closeAutoCaptionsPanel}
+						title={copy().closeAutoCaptionsPanel}
 					>
 						<X size={16} aria-hidden="true" />
 					</Button>
@@ -144,7 +149,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 				>
 					<Show when={isLoading() || props.state.job}>
 						<section class="diagnostics-section">
-							<h2>Progress</h2>
+							<h2>{copy().progressLabel}</h2>
 							<Show
 								when={isLoading()}
 								fallback={
@@ -157,7 +162,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 												aria-atomic="true"
 											>
 												<div class="asr-progress-row">
-													<span class="asr-progress-label">{asrJobLabel(job())}</span>
+													<span class="asr-progress-label">{asrJobLabel(copy(), job())}</span>
 													<span class="asr-progress-value tabular-nums">
 														{formatProgressPercent(job().fraction)}
 													</span>
@@ -166,10 +171,10 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 													class="asr-progress-bar"
 													value={clampFraction(job().fraction)}
 													max={1}
-													aria-label="Auto captions progress"
+													aria-label={copy().autoCaptionsProgressAria}
 												/>
 												<div class="asr-progress-meta">
-													<span>{job().clip?.fileName ?? 'Timeline range'}</span>
+													<span>{job().clip?.fileName ?? copy().timelineRange}</span>
 													<span class="tabular-nums">
 														{job().processedSeconds.toFixed(0)} / {job().totalSeconds.toFixed(0)} s
 													</span>
@@ -190,7 +195,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 										class="asr-progress-bar"
 										value={clampFraction(props.state.downloadFraction)}
 										max={1}
-										aria-label="Model download progress"
+										aria-label={copy().modelDownloadProgressAria}
 									/>
 									<div class="asr-progress-meta">
 										<span class="tabular-nums">{modelProgressMeta()}</span>
@@ -202,10 +207,10 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 					</Show>
 
 					<section class="diagnostics-section">
-						<h2>Model</h2>
+						<h2>{copy().modelLabel}</h2>
 						<Show when={props.state.models.length > 1}>
 							<label style={{ display: 'block', 'margin-bottom': '0.4rem' }}>
-								<span class="capability-panel-note">Choose a model</span>
+								<span class="capability-panel-note">{copy().chooseModel}</span>
 								<select
 									value={props.state.model.id}
 									disabled={props.state.modelStatus === 'loading' || props.state.job !== null}
@@ -225,21 +230,19 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 							{formatBytes(props.state.model.sizeBytes)}
 							{' · '}
 							<a href={props.state.model.infoUrl} target="_blank" rel="noopener noreferrer">
-								Learn more ↗
+								{copy().learnMoreArrow}
 							</a>
 						</p>
 						<Show when={props.state.modelStatus === 'loaded' && props.state.cached}>
-							<p class="capability-panel-note">
-								Loaded from this device's cache — no download needed.
-							</p>
+							<p class="capability-panel-note">{copy().modelLoadedFromCache}</p>
 						</Show>
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Engine</h2>
+						<h2>{copy().engine}</h2>
 						<dl class="diagnostics-grid">
 							<div>
-								<dt>Detected engine</dt>
+								<dt>{copy().detectedEngine}</dt>
 								<dd>
 									{engineLabel()}
 									<span
@@ -251,15 +254,15 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 								</dd>
 							</div>
 							<div>
-								<dt>Model status</dt>
+								<dt>{copy().modelStatus}</dt>
 								<dd>{props.state.modelStatus}</dd>
 							</div>
 							<div>
-								<dt>Model size</dt>
+								<dt>{copy().modelSize}</dt>
 								<dd>{formatBytes(props.state.modelSizeBytes)}</dd>
 							</div>
 							<div>
-								<dt>Last transcription</dt>
+								<dt>{copy().lastTranscription}</dt>
 								<dd>{formatDuration(props.state.lastDurationMs)}</dd>
 							</div>
 						</dl>
@@ -271,7 +274,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Language</h2>
+						<h2>{copy().languageLabel}</h2>
 						<div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
 							<label style={{ display: 'flex', 'align-items': 'center', gap: '0.25rem' }}>
 								<input
@@ -281,7 +284,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 									checked={language() === ''}
 									onChange={() => setLanguage('')}
 								/>
-								Auto-detect
+								{copy().autoDetect}
 							</label>
 							<label style={{ display: 'flex', 'align-items': 'center', gap: '0.25rem' }}>
 								<input
@@ -291,7 +294,7 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 									checked={language() === 'zh'}
 									onChange={() => setLanguage('zh')}
 								/>
-								Chinese (zh)
+								{copy().languageChinese}
 							</label>
 							<label style={{ display: 'flex', 'align-items': 'center', gap: '0.25rem' }}>
 								<input
@@ -301,18 +304,16 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 									checked={language() === 'en'}
 									onChange={() => setLanguage('en')}
 								/>
-								English (en)
+								{copy().languageEnglish}
 							</label>
 						</div>
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Clip</h2>
+						<h2>{copy().clip}</h2>
 						<Show
 							when={props.selectedClip}
-							fallback={
-								<p class="capability-panel-note">Select a clip on the timeline to transcribe.</p>
-							}
+							fallback={<p class="capability-panel-note">{copy().selectClipToTranscribe}</p>}
 						>
 							{(clip) => (
 								<p class="capability-panel-note">
@@ -323,19 +324,16 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 					</section>
 
 					<section class="diagnostics-section">
-						<h2>Actions</h2>
+						<h2>{copy().actionsLabel}</h2>
 						<div style={{ display: 'flex', gap: '0.5rem', 'flex-wrap': 'wrap' }}>
 							<Button
 								variant="secondary"
 								size="sm"
 								disabled={!availability().loadModel.enabled}
-								title={
-									availability().loadModel.reason ??
-									'Download and compile the selected Whisper model (cached for offline reuse)'
-								}
+								title={availability().loadModel.reason ?? copy().loadModelTitle}
 								onClick={props.onLoadModel}
 							>
-								Load model
+								{copy().loadModel}
 							</Button>
 							<Button
 								variant="secondary"
@@ -343,42 +341,40 @@ export const AutoCaptionsPanel: Component<AutoCaptionsPanelProps> = (props) => {
 								disabled={!availability().transcribeClip.enabled}
 								title={
 									availability().transcribeClip.reason ??
-									`Transcribe the selected clip${language() ? ' as ' + formatLanguage(language()) : ''}`
+									(language()
+										? copy().transcribeClipTitle.replace(
+												'{language}',
+												formatLanguage(copy(), language())
+											)
+										: copy().transcribeClipTitlePlain)
 								}
 								onClick={() => props.onTranscribeClip(language() || undefined)}
 							>
-								Transcribe selected clip
+								{copy().transcribeClip}
 							</Button>
 							<Button
 								variant="secondary"
 								size="sm"
 								disabled={!availability().transcribeRange.enabled}
-								title={
-									availability().transcribeRange.reason ?? 'Transcribe the visible timeline range'
-								}
+								title={availability().transcribeRange.reason ?? copy().transcribeRangeTitle}
 								onClick={() => props.onTranscribeRange(language() || undefined)}
 							>
-								Transcribe timeline range
+								{copy().transcribeRange}
 							</Button>
 							<Button
 								variant="secondary"
 								size="sm"
 								disabled={!availability().cancel.enabled}
-								title={
-									availability().cancel.reason ?? 'Cancel the running model load or transcription'
-								}
+								title={availability().cancel.reason ?? copy().cancelTitle}
 								onClick={props.onCancel}
 							>
-								Cancel
+								{copy().cancel}
 							</Button>
 						</div>
 					</section>
 				</Show>
 
-				<footer class="capability-panel-note">
-					Model: Whisper (MIT, OpenAI) run on-device by ONNX Runtime Web. Assets load from this
-					app's own origin only after you click "Load model".
-				</footer>
+				<footer class="capability-panel-note">{copy().footerWhisperNote}</footer>
 			</aside>
 		</Show>
 	);

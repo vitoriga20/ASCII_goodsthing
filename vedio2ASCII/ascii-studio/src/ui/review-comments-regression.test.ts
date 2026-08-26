@@ -60,11 +60,9 @@ describe('review comment regression guards', () => {
 
 	it('surfaces non-cancel bundle directory picker failures', () => {
 		expect(bundleDialogSource).toContain("import { errorMessage } from '../lib/error-message';");
+		expect(bundleDialogSource).toContain('const DIRECTORY_PERMISSION_DENIED_MESSAGE = () =>');
 		expect(bundleDialogSource).toContain(
-			"const DIRECTORY_PERMISSION_DENIED_MESSAGE = 'Directory access was not granted.';"
-		);
-		expect(bundleDialogSource).toContain(
-			"if (status !== 'granted') throw new Error(DIRECTORY_PERMISSION_DENIED_MESSAGE);"
+			"if (status !== 'granted') throw new Error(DIRECTORY_PERMISSION_DENIED_MESSAGE());"
 		);
 		expect(bundleDialogSource).toContain('const [pickerError, setPickerError] = createSignal');
 		expect(bundleDialogSource).toContain('setPickerError(errorMessage(error));');
@@ -128,8 +126,8 @@ describe('review comment regression guards', () => {
 		expect(audioInsertRowSource).toContain('<Show when={props.bypass}');
 		expect(audioInsertRowSource).toContain('<Show when={expanded()}>');
 		expect(audioInsertRowSource).toContain('const bypassActionLabel = () =>');
-		expect(audioInsertRowSource).toContain('`Enable ${props.label}`');
-		expect(audioInsertRowSource).toContain('`Bypass ${props.label}`');
+		expect(audioInsertRowSource).toContain("copy().enableX.replace('{x}', props.label)");
+		expect(audioInsertRowSource).toContain("copy().bypassX.replace('{x}', props.label)");
 		expect(audioInsertRowSource).toContain('aria-label={bypassActionLabel()}');
 	});
 

@@ -1,5 +1,6 @@
 import { Pause, Play, Square } from 'lucide-solid';
 import { Show } from 'solid-js';
+import { studioCopy, studioLocale } from './locale';
 
 export type RecorderStripSession = 'idle' | 'recording' | 'paused' | 'stopping';
 
@@ -21,18 +22,25 @@ function formatTime(us: number): string {
 }
 
 export function RecorderControlStrip(props: RecorderControlStripProps) {
+	const copy = () => studioCopy(studioLocale());
 	return (
-		<div class="recorder-control-strip" data-testid={props.testId} aria-label="Recorder controls">
+		<div
+			class="recorder-control-strip"
+			data-testid={props.testId}
+			aria-label={copy().recorderControls}
+		>
 			<div class="recorder-control-strip-time">
 				<strong>{formatTime(props.elapsedUs)}</strong>
-				<span aria-label="Paused">Paused {formatTime(props.pausedUs)}</span>
+				<span aria-label={copy().pausedLabel}>
+					{copy().pausedLabel} {formatTime(props.pausedUs)}
+				</span>
 			</div>
 			<div class="recorder-control-strip-actions">
 				<Show when={props.session === 'recording'}>
 					<button
 						type="button"
-						aria-label="Pause recording"
-						title="Pause recording"
+						aria-label={copy().pauseRecording}
+						title={copy().pauseRecording}
 						onClick={() => props.onPause()}
 					>
 						<Pause size={16} aria-hidden="true" />
@@ -41,8 +49,8 @@ export function RecorderControlStrip(props: RecorderControlStripProps) {
 				<Show when={props.session === 'paused'}>
 					<button
 						type="button"
-						aria-label="Resume recording"
-						title="Resume recording"
+						aria-label={copy().resumeRecording}
+						title={copy().resumeRecording}
 						onClick={() => props.onResume()}
 					>
 						<Play size={16} aria-hidden="true" />
@@ -50,8 +58,8 @@ export function RecorderControlStrip(props: RecorderControlStripProps) {
 				</Show>
 				<button
 					type="button"
-					aria-label="Stop recording"
-					title="Stop recording"
+					aria-label={copy().stopRecording}
+					title={copy().stopRecording}
 					onClick={() => props.onStop()}
 					disabled={props.session === 'stopping'}
 				>

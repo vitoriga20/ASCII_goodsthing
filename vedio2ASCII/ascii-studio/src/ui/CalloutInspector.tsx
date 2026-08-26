@@ -6,6 +6,7 @@
 
 import { createSignal, createEffect, Show, onCleanup } from 'solid-js';
 import type { CalloutPayload, CalloutStyle } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 interface CalloutInspectorProps {
 	trackId: string;
@@ -18,6 +19,7 @@ const PARAM_DEBOUNCE_MS = 80;
 
 export function CalloutInspector(props: CalloutInspectorProps) {
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	const copy = () => studioCopy(studioLocale());
 
 	// oxlint-disable-next-line solid/reactivity -- intentional initial seed; createEffect below syncs external changes
 	const [localStyle, setLocalStyle] = createSignal<CalloutStyle>({ ...props.callout.style });
@@ -49,11 +51,11 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 	return (
 		<section class="inspector-section">
-			<h3>Callout</h3>
+			<h3>{copy().callout}</h3>
 
 			<div class="callout-style-controls">
 				<label>
-					Colour
+					{copy().colour}
 					<input
 						type="color"
 						value={localStyle().color}
@@ -62,7 +64,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 				</label>
 
 				<label>
-					Stroke width
+					{copy().strokeWidth}
 					<input
 						type="range"
 						min={1}
@@ -76,7 +78,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 				<Show when={kind() === 'box' || kind() === 'spotlight'}>
 					<label>
-						Fill opacity
+						{copy().fillOpacity}
 						<input
 							type="range"
 							min={0}
@@ -91,7 +93,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 				<Show when={kind() === 'step'}>
 					<label>
-						Font size
+						{copy().fontSize}
 						<input
 							type="range"
 							min={8}
@@ -106,7 +108,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 				<Show when={kind() === 'arrow'}>
 					<label>
-						Arrowhead size
+						{copy().arrowheadSize}
 						<input
 							type="range"
 							min={4}
@@ -121,7 +123,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 				<Show when={kind() === 'blur'}>
 					<label>
-						Blur radius
+						{copy().blurRadius}
 						<input
 							type="range"
 							min={1}
@@ -136,7 +138,7 @@ export function CalloutInspector(props: CalloutInspectorProps) {
 
 				<Show when={kind() === 'spotlight'}>
 					<label>
-						Darken strength
+						{copy().darkenStrength}
 						<input
 							type="range"
 							min={0}

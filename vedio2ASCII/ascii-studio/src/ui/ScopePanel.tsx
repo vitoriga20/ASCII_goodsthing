@@ -23,6 +23,7 @@ import {
 	vectorscopeSlotOffset,
 	waveformSlotOffset
 } from '../engine/scopes';
+import { studioCopy, studioLocale } from './locale';
 
 export interface ScopePanelProps {
 	/** SAB ring buffer filled by the worker compositor. `null` on tiers without SAB. */
@@ -41,6 +42,7 @@ const WF_CANVAS_H = 128;
 const VEC_CANVAS_SIZE = SCOPE_VECTORSCOPE_SIZE;
 
 export default function ScopePanel(props: ScopePanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [fullscreenScope, setFullscreenScope] = createSignal<string | null>(null);
 	const [clipCount, setClipCount] = createSignal(0);
 	const clipPercent = createMemo(() => {
@@ -55,7 +57,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 	});
 	const clipLabel = createMemo(() => {
 		const pct = clipPercent();
-		return pct >= 1 ? `${pct.toFixed(1)}% clipped` : '<1% clipped';
+		return pct >= 1 ? copy().clippedPercent.replace('{n}', pct.toFixed(1)) : copy().clippedUnderOne;
 	});
 
 	let histCanvas: HTMLCanvasElement | undefined;
@@ -144,7 +146,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 			class="scope-panel"
 			classList={{ 'scope-panel--collapsed': props.collapsed() }}
 			role="region"
-			aria-label="Video scopes"
+			aria-label={copy().videoScopes}
 		>
 			<header class="scope-panel__header">
 				<button
@@ -153,7 +155,8 @@ export default function ScopePanel(props: ScopePanelProps) {
 					aria-expanded={!props.collapsed()}
 					aria-controls={!props.collapsed() ? 'scope-panel-grid' : undefined}
 				>
-					Scopes <span class="text-xs text-muted-foreground font-normal">(Experimental)</span>{' '}
+					{copy().scopes}{' '}
+					<span class="text-xs text-muted-foreground font-normal">{copy().experimental}</span>{' '}
 					{props.collapsed() ? '▸' : '▾'}
 				</button>
 				{clipSeverity() !== 'none' && (
@@ -166,7 +169,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 			{!props.collapsed() && (
 				<div class="scope-panel__grid" id="scope-panel-grid">
 					<ScopeView
-						label="Histogram"
+						label={copy().histogram}
 						width={HIST_CANVAS_W}
 						height={HIST_CANVAS_H}
 						fullscreen={fullscreenScope() === 'histogram'}
@@ -176,7 +179,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 						ref={(el) => (histCanvas = el)}
 					/>
 					<ScopeView
-						label="Waveform"
+						label={copy().waveform}
 						width={WF_CANVAS_W}
 						height={WF_CANVAS_H}
 						fullscreen={fullscreenScope() === 'waveform'}
@@ -186,7 +189,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 						ref={(el) => (wfCanvas = el)}
 					/>
 					<ScopeView
-						label="Parade"
+						label={copy().parade}
 						width={WF_CANVAS_W}
 						height={WF_CANVAS_H}
 						fullscreen={fullscreenScope() === 'parade'}
@@ -196,7 +199,7 @@ export default function ScopePanel(props: ScopePanelProps) {
 						ref={(el) => (paradeCanvas = el)}
 					/>
 					<ScopeView
-						label="Vectorscope"
+						label={copy().vectorScope}
 						width={VEC_CANVAS_SIZE}
 						height={VEC_CANVAS_SIZE}
 						fullscreen={fullscreenScope() === 'vectorscope'}
@@ -221,6 +224,7 @@ interface ScopeViewProps {
 }
 
 function ScopeView(props: ScopeViewProps) {
+	const copy = () => studioCopy(studioLocale());
 	return (
 		<div class="scope-view" classList={{ 'scope-view--fullscreen': props.fullscreen }}>
 			<div class="scope-view__header">
@@ -228,7 +232,7 @@ function ScopeView(props: ScopeViewProps) {
 				<button
 					class="scope-view__fullscreen-btn"
 					onClick={() => props.onToggleFullscreen()}
-					aria-label={`Toggle ${props.label} fullscreen`}
+					aria-label={copy().toggleXFullscreen.replace('{x}', props.label)}
 				>
 					⛶
 				</button>

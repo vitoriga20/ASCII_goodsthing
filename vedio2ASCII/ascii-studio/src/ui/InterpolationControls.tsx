@@ -9,6 +9,7 @@
 
 import { Show, type Component } from 'solid-js';
 import type { InterpolationAvailability, InterpolationModelStatus } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 export interface InterpolationControlsProps {
 	availability: InterpolationAvailability;
@@ -43,6 +44,7 @@ function formatEstimate(ms: number | null): string {
 }
 
 export const InterpolationControls: Component<InterpolationControlsProps> = (props) => {
+	const copy = () => studioCopy(studioLocale());
 	const isUnavailable = () => props.availability.state === 'unavailable';
 	const isExportOnly = () => props.availability.state === 'export-only';
 	const canPreview = () => props.availability.state === 'preview-and-export';
@@ -54,9 +56,9 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 	const modelLoading = () => props.modelStatus === 'loading';
 
 	return (
-		<div class="interpolation-controls" role="group" aria-label="Frame Interpolation">
+		<div class="interpolation-controls" role="group" aria-label={copy().frameInterpolation}>
 			<div class="interpolation-controls__header">
-				<span class="interpolation-controls__title">Frame Interpolation (ML)</span>
+				<span class="interpolation-controls__title">{copy().frameInterpolation}</span>
 				<Show when={reason()}>
 					<span
 						class="interpolation-controls__reason"
@@ -82,22 +84,27 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 								onClick={props.onLoadModel}
 								aria-label={
 									modelLoading()
-										? 'Loading interpolation model…'
-										: `Load interpolation model (${formatBytes(props.modelSizeBytes)})`
+										? copy().loadingInterpolationModel
+										: copy().loadInterpolationModel.replace(
+												'{size}',
+												formatBytes(props.modelSizeBytes)
+											)
 								}
 							>
-								{modelLoading() ? 'Loading…' : `Load model (${formatBytes(props.modelSizeBytes)})`}
+								{modelLoading()
+									? copy().loading
+									: copy().loadModel.replace('{size}', formatBytes(props.modelSizeBytes))}
 							</button>
 						}
 					>
-						<span class="interpolation-controls__model-status">Model loaded</span>
+						<span class="interpolation-controls__model-status">{copy().modelLoaded}</span>
 					</Show>
 				</div>
 
 				{/* Time estimate */}
 				<Show when={props.estimateMs !== null}>
 					<div class="interpolation-controls__estimate">
-						<span>Estimated time: {formatEstimate(props.estimateMs)}</span>
+						<span>{copy().estimatedTime.replace('{n}', formatEstimate(props.estimateMs))}</span>
 						<Show when={props.availability.state !== 'unavailable'}>
 							<span class="interpolation-controls__accelerator">
 								({props.availability.state !== 'unavailable' ? props.availability.accelerator : ''})
@@ -113,9 +120,9 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 						class="interpolation-controls__preview-btn"
 						disabled={!modelLoaded()}
 						onClick={() => props.onPreviewSegment()}
-						aria-label="Preview interpolated segment"
+						aria-label={copy().previewInterpolatedSegment}
 					>
-						Preview interpolated segment
+						{copy().previewInterpolatedSegment}
 					</button>
 				</Show>
 
@@ -129,13 +136,13 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 								onChange={(e) => props.onFpsUpconvertToggle(e.currentTarget.checked)}
 								disabled={!modelLoaded()}
 							/>
-							<span>FPS upconvert at export</span>
+							<span>{copy().fpsUpconvertAtExport}</span>
 						</label>
 
 						<Show when={props.fpsUpconvertEnabled}>
 							<div class="interpolation-controls__fps">
 								<label>
-									Target FPS:
+									{copy().targetFpsColon}
 									<input
 										type="number"
 										min={1}
@@ -158,7 +165,7 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 									onChange={(e) => props.onMotionBlurToggle(e.currentTarget.checked)}
 									disabled={!modelLoaded()}
 								/>
-								<span>Motion blur</span>
+								<span>{copy().motionBlur}</span>
 							</label>
 						</Show>
 
@@ -169,7 +176,7 @@ export const InterpolationControls: Component<InterpolationControlsProps> = (pro
 								aria-live="polite"
 								aria-atomic="true"
 							>
-								Export only — preview requires the accelerated tier
+								{copy().exportOnlyPreviewNote}
 							</span>
 						</Show>
 					</div>

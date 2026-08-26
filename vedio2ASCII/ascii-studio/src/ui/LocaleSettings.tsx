@@ -29,13 +29,13 @@ export function LocaleSettings(props: LocaleSettingsProps) {
 							>
 								简体中文
 							</button>
-							<button
-								type="button"
-								class={cn('locale-option', props.locale() === 'en' && 'is-active')}
-								onClick={() => props.onLocaleChange('en')}
-							>
-								English
-							</button>
+<button
+									type="button"
+									class={cn('locale-option', props.locale() === 'en' && 'is-active')}
+									onClick={() => props.onLocaleChange('en')}
+								>
+									{copy().localeEnglish}
+								</button>
 						</div>
 					</Popover.Content>
 				</Popover.Positioner>

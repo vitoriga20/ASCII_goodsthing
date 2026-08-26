@@ -10,6 +10,7 @@ export type CapabilityFeature =
 	| 'matte';
 
 import type { MatteProbeResult } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 export type CapabilityTier = 'accelerated' | 'limited' | 'starting' | 'blocked';
 
@@ -258,15 +259,16 @@ export function primaryLimitedIssue(
 	snapshot: CapabilitySnapshot,
 	runtime: CapabilityRuntime
 ): string | null {
+	const copy = () => studioCopy(studioLocale());
 	if (runtime.runtimeIssue) return runtime.runtimeIssue;
 	if (!snapshot.crossOriginIsolated) {
-		return 'This page is missing COOP/COEP headers. LocalCut still runs as a client-side shell, but accelerated import, playback, effects, and export need those headers so the browser can expose SharedArrayBuffer for local CPU/GPU work.';
+		return copy().coopCoepMissing;
 	}
 	if (!snapshot.sharedArrayBuffer) {
-		return 'This browser or origin cannot expose SharedArrayBuffer. The app shell stays client-side, but accelerated import, playback, effects, and export need SAB plus COOP/COEP headers so the local CPU/GPU path can run safely.';
+		return copy().sabMissing;
 	}
 	if (runtime.workerReady && !runtime.webgpuReady) {
-		return 'WebGPU is unavailable in this browser. Accelerated import, playback, effects, and export require a WebGPU-capable Chromium browser.';
+		return copy().webgpuMissing;
 	}
 	return null;
 }
@@ -276,11 +278,12 @@ export function importUnavailableReason(
 	snapshot: CapabilitySnapshot,
 	runtime: CapabilityRuntime
 ): string | null {
+	const copy = () => studioCopy(studioLocale());
 	if (tier === 'accelerated') return null;
-	if (tier === 'starting') return 'Waiting for the accelerated pipeline to finish starting…';
-	if (tier === 'blocked') return 'This browser cannot access local media files.';
+	if (tier === 'starting') return copy().pipelineStarting;
+	if (tier === 'blocked') return copy().noLocalMedia;
 	if (canCompatibilityPreview(snapshot)) {
-		return 'Accelerated import is unavailable. Compatibility import loads a reduced thumbnail preview only.';
+		return copy().compatImportOnly;
 	}
-	return primaryLimitedIssue(snapshot, runtime) ?? 'Import is unavailable in limited mode.';
+	return primaryLimitedIssue(snapshot, runtime) ?? copy().importLimited;
 }

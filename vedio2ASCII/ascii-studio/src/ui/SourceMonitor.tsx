@@ -32,18 +32,17 @@ export function SourceMonitor(props: SourceMonitorProps) {
 	});
 
 	return (
-		<section class="source-monitor" aria-label="Original source preview">
+		<section class="source-monitor" aria-label={copy().originalSourcePreview}>
 			<div class="monitor-label">
 				<span>{copy().originalMonitor}</span>
 				<span>{copy().live}</span>
 			</div>
-			<Show
-				when={props.src()}
-				fallback={<p class="monitor-empty">{copy().emptySource}</p>}
-			>
+			<Show when={props.src()} fallback={<p class="monitor-empty">{copy().emptySource}</p>}>
 				{(src) => (
 					<video
-						ref={video}
+						ref={(el) => {
+							video = el;
+						}}
 						class="source-monitor-video"
 						src={src()}
 						muted

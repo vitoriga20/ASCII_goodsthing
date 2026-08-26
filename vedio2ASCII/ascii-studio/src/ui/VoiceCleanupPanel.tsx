@@ -3,6 +3,7 @@ import { Mic, BarChart3, Shield, AlertTriangle } from 'lucide-solid';
 import { AudioInsertRow } from './AudioInsertRow';
 import { Button } from './components/button';
 import { RailEmpty } from './RailEmpty';
+import { studioCopy, studioLocale } from './locale';
 import type { VoiceCleanupSettings, GateParams, LimiterParams } from '../protocol';
 
 export interface VoiceCleanupPanelProps {
@@ -72,8 +73,8 @@ export function voiceCleanupAnalysisDisabledReason(
 	analysisState: VoiceCleanupPanelProps['analysisState'],
 	timelineEmpty: boolean
 ): string | null {
-	if (analysisState === 'running') return 'Analysis is already running.';
-	if (timelineEmpty) return 'Timeline is empty.';
+	if (analysisState === 'running') return studioCopy(studioLocale()).analysisAlreadyRunning;
+	if (timelineEmpty) return studioCopy(studioLocale()).timelineEmpty;
 	return null;
 }
 
@@ -101,6 +102,7 @@ export function voiceCleanupLatencyBudget(sampleRate: number): ReadonlyArray<{
 }
 
 export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [expanded, setExpanded] = createSignal(props.initiallyExpanded ?? false);
 	const [customTargetLufs, setCustomTargetLufs] = createSignal(-14);
 	const [useCustomTarget, setUseCustomTarget] = createSignal(false);
@@ -150,20 +152,21 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 				aria-expanded={expanded()}
 				aria-controls={expanded() ? 'voice-cleanup-body' : undefined}
 			>
-				<span class="panel-title">Voice Cleanup</span>
-				<span class="latency-display">Latency: {props.latencyMs.toFixed(1)} ms</span>
+				<span class="panel-title">{copy().voiceCleanup}</span>
+				<span class="latency-display">
+					{copy().latencyMs.replace('{x}', props.latencyMs.toFixed(1))}
+				</span>
 			</button>
 			<Show when={expanded()}>
 				<div class="collapse-body" id="voice-cleanup-body">
 					<Show when={props.timelineEmpty}>
-						<RailEmpty compact title="Add audio to clean it up">
-							Import a clip and place it on an audio track. Denoise and loudness tools activate once
-							timeline audio is present.
+						<RailEmpty compact title={copy().addAudioToClean}>
+							{copy().voiceEmptyNote}
 						</RailEmpty>
 					</Show>
 					{/* Section (a): Denoiser */}
 					<AudioInsertRow
-						label="Denoiser"
+						label={copy().denoiser}
 						icon={<Mic size={14} aria-hidden="true" />}
 						bypass={props.settings.denoiserEnabledTracks.length === 0}
 						onToggleBypass={() => {
@@ -175,39 +178,37 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 					>
 						<div class="denoiser-tracks">
 							<Show when={props.trackNames.size === 0 && !props.timelineEmpty}>
-								<p class="placeholder-text">
-									Add audio clips to the timeline to enable per-track denoising.
-								</p>
+								<p class="placeholder-text">{copy().addAudioTracksHint}</p>
 							</Show>
 							<Show when={props.trackNames.size === 0 && props.timelineEmpty}>
-								<p class="placeholder-text">No audio tracks yet.</p>
+								<p class="placeholder-text">{copy().noAudioTracksYet}</p>
 							</Show>
 							<Show when={props.trackNames.size > 0}>
-								<p class="insert-hint">
-									Enable per-track denoising. The denoiser runs on the monitor bus and export chain.
-								</p>
+								<p class="insert-hint">{copy().enablePerTrackDenoise}</p>
 							</Show>
 							<Show when={props.denoiserStatus === 'unavailable'}>
 								<div class="analysis-error" role="alert">
 									<AlertTriangle size={14} />
-									<span>Denoiser unavailable: {props.denoiserUnavailableReason}</span>
+									<span>
+										{copy().denoiserUnavailable.replace('{x}', props.denoiserUnavailableReason)}
+									</span>
 								</div>
 							</Show>
 							<Show when={props.denoiserStatus === 'loading'}>
 								<p class="insert-hint" role="status" aria-live="polite" aria-atomic="true">
-									Loading RNNoise WASM…
+									{copy().loadingRNNoise}
 								</p>
 							</Show>
 							<Show when={props.denoiserStatus === 'ready'}>
 								<p class="insert-hint" role="status" aria-live="polite" aria-atomic="true">
-									RNNoise WASM ready.
+									{copy().rnnoiseReady}
 								</p>
 							</Show>
 							<table class="latency-budget-table">
 								<thead>
 									<tr>
-										<th scope="col">Stage</th>
-										<th scope="col">Samples</th>
+										<th scope="col">{copy().latencyStage}</th>
+										<th scope="col">{copy().latencySamples}</th>
 										<th scope="col">ms</th>
 									</tr>
 								</thead>
@@ -222,7 +223,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 										)}
 									</For>
 									<tr>
-										<th scope="row">Total</th>
+										<th scope="row">{copy().latencyTotal}</th>
 										<td>848</td>
 										<td>{props.latencyMs.toFixed(2)}</td>
 									</tr>
@@ -246,7 +247,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 
 					{/* Section (b): Loudness Normalisation */}
 					<AudioInsertRow
-						label="Loudness Normalisation"
+						label={copy().loudnessNormalisation}
 						icon={<BarChart3 size={14} aria-hidden="true" />}
 						bypass={props.settings.normaliseGainDb === 0}
 						onToggleBypass={() => {
@@ -258,7 +259,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 					>
 						<div class="loudness-controls">
 							<div class="target-selector">
-								<span class="slider-label">Target</span>
+								<span class="slider-label">{copy().loudnessTarget}</span>
 								<For each={LUFS_TARGETS}>
 									{(target) => (
 										<Button
@@ -285,12 +286,12 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 									size="sm"
 									onClick={() => setUseCustomTarget(true)}
 								>
-									Custom
+									{copy().custom}
 								</Button>
 							</div>
 							<Show when={useCustomTarget()}>
 								<SliderControl
-									label="Custom"
+									label={copy().custom}
 									value={customTargetLufs()}
 									min={-36}
 									max={-6}
@@ -310,7 +311,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 											<progress value={props.analysisProgress} max={1} />
 											<span>{(props.analysisProgress * 100).toFixed(0)}%</span>
 											<Button variant="secondary" size="sm" onClick={props.onCancelAnalysis}>
-												Cancel
+												{copy().cancel}
 											</Button>
 										</div>
 									}
@@ -332,25 +333,25 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 										}
 										onClick={() => props.onAnalyseLoudness(currentTarget())}
 									>
-										Analyse &amp; Normalise
+										{copy().analyseAndNormalise}
 									</Button>
 								</Show>
 							</div>
 							<Show when={props.analysisState === 'done'}>
 								<div class="analysis-result">
 									<dl class="diagnostics-grid">
-										<dt>Measured</dt>
+										<dt>{copy().loudnessMeasured}</dt>
 										<dd>
 											{Number.isFinite(props.measuredLufs)
 												? `${props.measuredLufs.toFixed(1)} LUFS`
 												: '−∞ LUFS'}
 										</dd>
-										<dt>Correction</dt>
+										<dt>{copy().loudnessCorrection}</dt>
 										<dd>
 											{props.proposedGainDb >= 0 ? '+' : ''}
 											{props.proposedGainDb.toFixed(1)} dB
 										</dd>
-										<dt>Result</dt>
+										<dt>{copy().loudnessResult}</dt>
 										<dd>
 											{Number.isFinite(props.normalisedLufs)
 												? `${props.normalisedLufs.toFixed(1)} LUFS`
@@ -362,15 +363,17 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 										size="sm"
 										onClick={() => props.onApplyNormalisation(props.proposedGainDb)}
 									>
-										Apply ({props.proposedGainDb >= 0 ? '+' : ''}
-										{props.proposedGainDb.toFixed(1)} dB)
+										{copy().applyGain.replace(
+											'{x}',
+											`${props.proposedGainDb >= 0 ? '+' : ''}${props.proposedGainDb.toFixed(1)} dB`
+										)}
 									</Button>
 									<Button
 										variant="secondary"
 										size="sm"
 										onClick={() => props.onApplyNormalisation(0)}
 									>
-										Reset
+										{copy().reset}
 									</Button>
 								</div>
 							</Show>
@@ -382,8 +385,10 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							</Show>
 							<Show when={props.settings.normaliseGainDb !== 0}>
 								<p class="insert-hint">
-									Active correction: {props.settings.normaliseGainDb >= 0 ? '+' : ''}
-									{props.settings.normaliseGainDb.toFixed(1)} dB
+									{copy().activeCorrection.replace(
+										'{x}',
+										`${props.settings.normaliseGainDb >= 0 ? '+' : ''}${props.settings.normaliseGainDb.toFixed(1)}`
+									)}
 								</p>
 							</Show>
 						</div>
@@ -391,13 +396,13 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 
 					{/* Section (c): Gate */}
 					<AudioInsertRow
-						label="Gate"
+						label={copy().gate}
 						icon={<Shield size={14} aria-hidden="true" />}
 						bypass={gateBypass()}
 						onToggleBypass={() => updateGateParams({ bypass: !gateBypass() })}
 					>
 						<SliderControl
-							label="Threshold"
+							label={copy().threshold}
 							value={props.settings.gateParams.thresholdDb}
 							min={-80}
 							max={0}
@@ -406,7 +411,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateGateParams({ thresholdDb: v })}
 						/>
 						<SliderControl
-							label="Range"
+							label={copy().range}
 							value={props.settings.gateParams.rangeDb}
 							min={-80}
 							max={0}
@@ -415,7 +420,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateGateParams({ rangeDb: v })}
 						/>
 						<SliderControl
-							label="Attack"
+							label={copy().attack}
 							value={props.settings.gateParams.attackMs}
 							min={0.1}
 							max={50}
@@ -424,7 +429,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateGateParams({ attackMs: v })}
 						/>
 						<SliderControl
-							label="Hold"
+							label={copy().hold}
 							value={props.settings.gateParams.holdMs}
 							min={0}
 							max={500}
@@ -433,7 +438,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateGateParams({ holdMs: v })}
 						/>
 						<SliderControl
-							label="Release"
+							label={copy().release}
 							value={props.settings.gateParams.releaseMs}
 							min={1}
 							max={500}
@@ -445,13 +450,13 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 
 					{/* Section (d): Limiter */}
 					<AudioInsertRow
-						label="Limiter"
+						label={copy().limiter}
 						icon={<AlertTriangle size={14} aria-hidden="true" />}
 						bypass={limiterBypass()}
 						onToggleBypass={() => updateLimiterParams({ bypass: !limiterBypass() })}
 					>
 						<SliderControl
-							label="Ceiling"
+							label={copy().ceiling}
 							value={props.settings.limiterCeilingDbtp}
 							min={-9}
 							max={-0.1}
@@ -460,7 +465,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateSettings({ limiterCeilingDbtp: v })}
 						/>
 						<SliderControl
-							label="Attack"
+							label={copy().attack}
 							value={props.settings.limiterParams.attackUs}
 							min={10}
 							max={1000}
@@ -469,7 +474,7 @@ export function VoiceCleanupPanel(props: VoiceCleanupPanelProps) {
 							onChange={(v) => updateLimiterParams({ attackUs: v })}
 						/>
 						<SliderControl
-							label="Release"
+							label={copy().release}
 							value={props.settings.limiterParams.releaseMs}
 							min={1}
 							max={200}

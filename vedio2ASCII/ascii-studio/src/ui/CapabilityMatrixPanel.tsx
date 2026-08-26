@@ -2,19 +2,20 @@ import { createMemo, For, Show } from 'solid-js';
 import type { AiAvailability, CapabilityProbeResult, FeatureSupport } from '../protocol';
 import { languageToolsSurfaceVisible } from '../protocol';
 import { type CapabilityRow, webnnRow } from './capability-rows';
+import { studioCopy, studioLocale } from './locale';
 
 interface CapabilityMatrixPanelProps {
 	probe: CapabilityProbeResult | null;
 }
 
-function supportChip(support: FeatureSupport): string {
+function supportChip(support: FeatureSupport, copy: ReturnType<typeof studioCopy>): string {
 	switch (support) {
 		case 'supported':
-			return 'Supported';
+			return copy.supportSupported;
 		case 'unsupported':
-			return 'Unsupported';
+			return copy.supportUnsupported;
 		case 'unknown':
-			return 'Unknown';
+			return copy.supportUnknown;
 	}
 }
 
@@ -30,237 +31,220 @@ function canHeadersUnlockCore(probe: CapabilityProbeResult): boolean {
 	);
 }
 
-function rowsForProbe(probe: CapabilityProbeResult): CapabilityRow[] {
+function rowsForProbe(
+	probe: CapabilityProbeResult,
+	copy: ReturnType<typeof studioCopy>
+): CapabilityRow[] {
 	const sabAction = !probe.crossOriginIsolated
 		? canHeadersUnlockCore(probe)
-			? 'Serve the app with COOP/COEP headers to unlock the core tier.'
-			: 'COOP/COEP is one missing requirement; this browser still has other tier limits.'
+			? copy.serveWithCoopCoep
+			: copy.coopCoepOneMissing
 		: null;
 	return [
 		{
-			label: 'WebGPU standard',
+			label: copy.webGpuStandard,
 			support: probe.webGPUCore,
 			active:
 				probe.tier === 'core-webgpu' ||
 				(probe.tier === 'compatibility-webgpu' && !probe.compatibilityAdapter),
-			action:
-				probe.webGPUCore === 'supported'
-					? null
-					: 'Enable hardware acceleration or use a WebGPU-capable browser.'
+			action: probe.webGPUCore === 'supported' ? null : copy.enableHardwareAccelerationOrWebGpu
 		},
 		{
-			label: 'WebGPU compatibility adapter',
+			label: copy.webGpuCompatAdapter,
 			support: probe.webGPUCompat,
 			active: probe.compatibilityAdapter,
 			action:
 				probe.webGPUCompat === 'supported' || probe.webGPUCore === 'supported'
 					? null
-					: 'No WebGPU adapter detected; use a browser with WebGPU for GPU preview.'
+					: copy.noWebGpuAdapterDetected
 		},
 		{
-			label: 'VideoDecoder',
+			label: copy.videoDecoder,
 			support: probe.webCodecsDecode,
 			active: probe.webCodecsDecode === 'supported' && probe.tier !== 'shell-only',
-			action:
-				probe.webCodecsDecode === 'supported'
-					? null
-					: 'Use a browser with WebCodecs decode support.'
+			action: probe.webCodecsDecode === 'supported' ? null : copy.useWebCodecsDecodeBrowser
 		},
 		{
-			label: 'VideoEncoder',
+			label: copy.videoEncoder,
 			support: probe.webCodecsEncode,
 			active: probe.webCodecsEncode === 'supported' && probe.tier !== 'shell-only',
-			action:
-				probe.webCodecsEncode === 'supported'
-					? null
-					: 'Export is limited without WebCodecs encode support.'
+			action: probe.webCodecsEncode === 'supported' ? null : copy.exportLimitedWithoutEncode
 		},
 		{
-			label: 'H.264 decode',
+			label: copy.h264Decode,
 			support: probe.codecs.h264Decode,
 			active: probe.codecs.h264Decode === 'supported',
 			action: null
 		},
 		{
-			label: 'VP9 decode',
+			label: copy.vp9Decode,
 			support: probe.codecs.vp9Decode,
 			active: probe.codecs.vp9Decode === 'supported',
 			action: null
 		},
 		{
-			label: 'AV1 decode',
+			label: copy.av1Decode,
 			support: probe.codecs.av1Decode,
 			active: probe.codecs.av1Decode === 'supported',
 			action: null
 		},
 		{
-			label: 'H.264 encode',
+			label: copy.h264Encode,
 			support: probe.codecs.h264Encode,
 			active: probe.codecs.h264Encode === 'supported',
 			action: null
 		},
 		{
-			label: 'VP9 encode',
+			label: copy.vp9Encode,
 			support: probe.codecs.vp9Encode,
 			active: probe.codecs.vp9Encode === 'supported',
 			action: null
 		},
 		{
-			label: 'AV1 encode',
+			label: copy.av1Encode,
 			support: probe.codecs.av1Encode,
 			active: probe.tier === 'core-webgpu' && probe.codecs.av1Encode === 'supported',
 			action: null
 		},
 		{
-			label: 'AAC decode',
+			label: copy.aacDecode,
 			support: probe.codecs.aacDecode,
 			active: probe.codecs.aacDecode === 'supported',
 			action: null
 		},
 		{
-			label: 'Opus decode',
+			label: copy.opusDecode,
 			support: probe.codecs.opusDecode,
 			active: probe.codecs.opusDecode === 'supported',
 			action: null
 		},
 		{
-			label: 'AAC encode',
+			label: copy.aacEncode,
 			support: probe.codecs.aacEncode,
 			active: probe.codecs.aacEncode === 'supported',
 			action: null
 		},
 		{
-			label: 'Opus encode',
+			label: copy.opusEncode,
 			support: probe.codecs.opusEncode,
 			active: probe.codecs.opusEncode === 'supported',
 			action: null
 		},
 		{
-			label: 'SharedArrayBuffer',
+			label: copy.sharedArrayBuffer,
 			support: probe.sharedArrayBuffer,
 			active: probe.sharedArrayBuffer === 'supported',
 			action: sabAction
 		},
 		{
-			label: 'OffscreenCanvas',
+			label: copy.offscreenCanvas,
 			support: probe.offscreenCanvas,
 			active: probe.offscreenCanvas === 'supported' && probe.tier !== 'shell-only',
-			action:
-				probe.offscreenCanvas === 'supported'
-					? null
-					: 'Preview tiers require worker-owned OffscreenCanvas.'
+			action: probe.offscreenCanvas === 'supported' ? null : copy.previewRequiresOffscreenCanvas
 		},
 		{
-			label: 'File System Access',
+			label: copy.fileSystemAccess,
 			support: probe.fileSystemAccess,
 			active: probe.fileSystemAccess === 'supported',
-			action:
-				probe.fileSystemAccess === 'supported'
-					? null
-					: 'Exports use blob download when direct file saving is unavailable.'
+			action: probe.fileSystemAccess === 'supported' ? null : copy.blobDownloadFallback
 		},
-		{ label: 'OPFS', support: probe.opfs, active: probe.opfs === 'supported', action: null },
+		{ label: copy.opfs, support: probe.opfs, active: probe.opfs === 'supported', action: null },
 		{
-			label: 'AudioWorklet',
+			label: copy.audioWorklet,
 			support: probe.audioWorklet,
 			active: probe.audioWorklet === 'supported',
 			action: null
 		},
-		cleanupRow(probe),
-		webnnRow(probe),
-		asrRow(probe),
-		smartReframeRow(probe),
+		cleanupRow(probe, copy),
+		webnnRow(probe, copy),
+		asrRow(probe, copy),
+		smartReframeRow(probe, copy),
 		...(probe.languageTools && languageToolsSurfaceVisible(probe.languageTools)
-			? [languageToolsRow(probe)]
+			? [languageToolsRow(probe, copy)]
 			: []),
 		// ── Capture Engine (Phase 41) probes ─────────────────────────
 		{
-			label: 'Capture: MSTP',
+			label: copy.captureMstp,
 			support: probe.capture.mediaStreamTrackProcessor,
 			active: probe.capture.mediaStreamTrackProcessor === 'supported',
 			action:
-				probe.capture.mediaStreamTrackProcessor === 'supported'
-					? null
-					: 'Recording requires MediaStreamTrackProcessor (Chromium desktop).'
+				probe.capture.mediaStreamTrackProcessor === 'supported' ? null : copy.recordingRequiresMstp
 		},
 		{
-			label: 'Capture: Transferable Track',
+			label: copy.captureTransferableTrack,
 			support: probe.capture.transferableMediaStreamTrack,
 			active: probe.capture.transferableMediaStreamTrack === 'supported',
 			action:
 				probe.capture.transferableMediaStreamTrack === 'supported'
 					? null
-					: 'Enables the accelerated worker-track recording path. Without it, recording falls back to the main-thread main-frames path; Program Mode still requires it.'
+					: copy.transferableTrackAction
 		},
 		{
-			label: 'Capture: Display Capture',
+			label: copy.captureDisplayCapture,
 			support: probe.capture.displayCapture,
 			active: probe.capture.displayCapture === 'supported',
 			action:
 				probe.capture.displayCapture === 'supported'
 					? null
-					: 'Screen recording requires getDisplayMedia support.'
+					: copy.screenRecordingRequiresDisplayMedia
 		},
 		{
-			label: 'Capture: Display Audio',
+			label: copy.captureDisplayAudio,
 			support: probe.capture.displayAudioCapture,
 			active: probe.capture.displayAudioCapture === 'supported',
 			action:
 				probe.capture.displayAudioCapture === 'supported'
 					? null
 					: probe.capture.displayAudioCapture === 'unknown'
-						? 'System/tab audio capture support is unknown until first use.'
-						: 'System/tab audio capture is not available on this platform.'
+						? copy.displayAudioUnknown
+						: copy.displayAudioNotAvailable
 		},
 		{
-			label: 'Capture: Video Encode (realtime)',
+			label: copy.captureVideoEncodeRealtime,
 			support: probe.capture.videoEncodeRealtime,
 			active: probe.capture.videoEncodeRealtime === 'supported',
 			action:
 				probe.capture.videoEncodeRealtime === 'supported'
 					? null
-					: 'Recording requires hardware-accelerated realtime video encoding.'
+					: copy.recordingRequiresHwRealtimeEncode
 		},
 		{
-			label: 'Capture: Opus Encode',
+			label: copy.captureOpusEncode,
 			support: probe.capture.audioEncodeOpus,
 			active: probe.capture.audioEncodeOpus === 'supported',
-			action:
-				probe.capture.audioEncodeOpus === 'supported'
-					? null
-					: 'Audio recording requires Opus encode support.'
+			action: probe.capture.audioEncodeOpus === 'supported' ? null : copy.audioRecordingRequiresOpus
 		},
 		{
-			label: 'Capture: AAC Encode',
+			label: copy.captureAacEncode,
 			support: probe.capture.audioEncodeAac,
 			active: probe.capture.audioEncodeAac === 'supported',
 			action: null
 		},
 		{
-			label: 'Capture: OPFS Sync Access',
+			label: copy.captureOpfsSyncAccess,
 			support: probe.capture.opfsSyncAccessHandle,
 			active: probe.capture.opfsSyncAccessHandle === 'supported',
 			action:
 				probe.capture.opfsSyncAccessHandle === 'supported'
 					? null
-					: 'Recording requires OPFS SyncAccessHandle for crash-safe writes.'
+					: copy.recordingRequiresOpfsSyncAccess
 		},
 		...(probe.captureUx
 			? [
 					{
-						label: 'Document PiP',
+						label: copy.documentPip,
 						support: probe.captureUx.documentPip,
 						active: probe.captureUx.documentPip === 'supported',
 						action: null
 					},
 					{
-						label: 'Region Capture (Experimental)',
+						label: copy.regionCapture,
 						support: probe.captureUx.cropTarget,
 						active: probe.captureUx.cropTarget === 'supported',
 						action: null
 					},
 					{
-						label: 'Element Capture (Experimental)',
+						label: copy.elementCapture,
 						support: probe.captureUx.elementCapture,
 						active: probe.captureUx.elementCapture === 'supported',
 						action: null
@@ -270,105 +254,119 @@ function rowsForProbe(probe: CapabilityProbeResult): CapabilityRow[] {
 	];
 }
 
-function cleanupRow(probe: CapabilityProbeResult): CapabilityRow {
+function cleanupRow(
+	probe: CapabilityProbeResult,
+	copy: ReturnType<typeof studioCopy>
+): CapabilityRow {
 	const cleanup = probe.cleanup;
 	const supported = cleanup?.wasmAvailable ?? typeof WebAssembly !== 'undefined';
 	return {
-		label: 'Audio cleanup (DTLN)',
+		label: copy.audioCleanupDltn,
 		support: supported ? 'supported' : 'unsupported',
 		active: false,
 		action: supported
-			? `Local Audio Cleanup (Experimental) available via ONNX Runtime (${cleanup?.accelerator ?? 'wasm'}).`
-			: 'Audio cleanup requires WebAssembly.'
+			? copy.audioCleanupAvailable.replace('{x}', cleanup?.accelerator ?? 'wasm')
+			: copy.audioCleanupRequiresWasm
 	};
 }
 
 /** ASR probes gate only the experimental Auto Captions feature — never the tier. */
-function asrRow(probe: CapabilityProbeResult): CapabilityRow {
+function asrRow(probe: CapabilityProbeResult, copy: ReturnType<typeof studioCopy>): CapabilityRow {
 	const asr = probe.asr;
 	const engineLabel =
 		asr && asr.recommended === 'ort-whisper' ? 'ONNX Whisper (WASM)' : 'unavailable';
 	const supported = asr?.recommended !== 'none';
 	return {
-		label: 'Auto Captions (ASR)',
+		label: copy.autoCaptionsAsr,
 		support: asr ? (supported ? 'supported' : 'unsupported') : 'unknown',
 		active: false,
 		action: supported
-			? `Auto Captions (Experimental) available via ${engineLabel}.`
-			: 'On-device captions require WebAssembly support.'
+			? copy.autoCaptionsAvailable.replace('{x}', engineLabel)
+			: copy.onDeviceCaptionsRequireWasm
 	};
 }
 
 /** Smart Reframe (Phase 33) gates only the optional reframe tool — never the
  *  tier (R8.4). Saliency is always available; face detection is reported
  *  separately and is currently unbundled (saliency-only, R8.2). */
-function smartReframeRow(probe: CapabilityProbeResult): CapabilityRow {
+function smartReframeRow(
+	probe: CapabilityProbeResult,
+	copy: ReturnType<typeof studioCopy>
+): CapabilityRow {
 	const sr = probe.smartReframe;
 	if (!sr) {
-		return { label: 'Smart Reframe', support: 'unknown', active: false, action: null };
+		return { label: copy.smartReframe, support: 'unknown', active: false, action: null };
 	}
 	const workerOk = sr.analysisWorker === 'supported';
 	const faceOk = sr.faceDetection === 'supported';
 	return {
-		label: 'Smart Reframe',
+		label: copy.smartReframe,
 		support: workerOk ? 'supported' : 'unsupported',
 		active: false,
 		action: !workerOk
-			? 'Smart Reframe needs Web Workers.'
+			? copy.smartReframeNeedsWorkers
 			: faceOk
-				? 'Auto crop-path (Experimental) with face detection.'
-				: 'Auto crop-path (Experimental) using visual saliency; no face model bundled.'
+				? copy.autoCropPathFaceDetection
+				: copy.autoCropPathSaliency
 	};
 }
 
 /** Phase 40: display-only row, shown only when the Language Tools surface is
  *  visible (so unsupported browsers see nothing — no nag). */
-function languageToolsRow(probe: CapabilityProbeResult): CapabilityRow {
+function languageToolsRow(
+	probe: CapabilityProbeResult,
+	copy: ReturnType<typeof studioCopy>
+): CapabilityRow {
 	const lt = probe.languageTools;
 	const usable = (a: AiAvailability | undefined): boolean =>
 		a === 'available' || a === 'downloadable' || a === 'downloading';
 	const parts: string[] = [];
 	if (lt) {
-		if (Object.values(lt.translator).some(usable)) parts.push('Translate');
-		if (usable(lt.summarizer) || usable(lt.languageModel)) parts.push('Draft');
+		if (Object.values(lt.translator).some(usable)) parts.push(copy.languageToolTranslate);
+		if (usable(lt.summarizer) || usable(lt.languageModel)) parts.push(copy.languageToolDraft);
 	}
 	return {
-		label: 'Language Tools (Chrome AI)',
+		label: copy.languageToolsChromeAi,
 		support: 'supported',
 		active: false,
-		action: `On-device ${parts.join(' + ') || 'language tools'} available (Chrome only).`
+		action: copy.onDeviceToolsAvailable.replace('{x}', parts.join(' + ') || copy.languageToolsLabel)
 	};
 }
 
 export function CapabilityMatrixPanel(props: CapabilityMatrixPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const rows = createMemo(() => {
 		const probe = props.probe;
-		return probe ? rowsForProbe(probe) : [];
+		return probe ? rowsForProbe(probe, copy()) : [];
 	});
 
 	return (
 		<section class="capability-matrix">
 			<Show
 				when={props.probe}
-				fallback={<p class="capability-panel-note">Capability probe pending.</p>}
+				fallback={<p class="capability-panel-note">{copy().capabilityProbePending}</p>}
 			>
 				{(probe) => (
 					<>
 						<div class={`capability-v2-badge is-${probe().tier}`}>
-							<span>Capability V2</span>
+							<span>{copy().capabilityV2}</span>
 							<strong>{probe().tier}</strong>
 						</div>
 						<details>
-							<summary>Browser info</summary>
-							<p>{typeof navigator === 'undefined' ? 'Unknown browser' : navigator.userAgent}</p>
+							<summary>{copy().browserInfo}</summary>
+							<p>
+								{typeof navigator === 'undefined' ? copy().unknownBrowser : navigator.userAgent}
+							</p>
 						</details>
 						<ul class="capability-matrix-list">
 							<For each={rows()}>
 								{(row) => (
 									<li class="capability-matrix-row">
 										<span>{row.label}</span>
-										<span class={`support-chip is-${row.support}`}>{supportChip(row.support)}</span>
-										<span>{row.active ? 'Active' : '-'}</span>
+										<span class={`support-chip is-${row.support}`}>
+											{supportChip(row.support, copy())}
+										</span>
+										<span>{row.active ? copy().active : '-'}</span>
 										<Show when={row.action}>
 											{(action) => <span class="capability-item-action">{action()}</span>}
 										</Show>

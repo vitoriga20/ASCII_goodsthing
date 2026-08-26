@@ -10,16 +10,26 @@ export interface CapabilityRow {
 	action: string | null;
 }
 
-export function webnnRow(probe: CapabilityProbeResult): CapabilityRow {
+/** Copy tokens consumed by {@link webnnRow}; kept as a narrow interface so the
+ *  pure row builders stay JSX-free and unit-testable in node. */
+export interface WebnnRowCopy {
+	webnnLabel: string;
+	webnnActionEnable: string;
+	webnnActionEp: string;
+}
+
+export function webnnRow(probe: CapabilityProbeResult, copy: WebnnRowCopy): CapabilityRow {
 	// Read WebNN from the stored probe snapshot (populated by probeBeauty) like
 	// every other row — not a live `navigator.ml` query, so it stays consistent
 	// with the snapshot and respects the DEV `__localcutCapabilityOverrides` hook.
 	const hasMl = probe.beauty?.webnn === 'supported';
 	const ortEp = probe.cleanup?.accelerator;
 	return {
-		label: 'WebNN (ML acceleration)',
+		label: copy.webnnLabel,
 		support: hasMl ? 'supported' : 'unsupported',
 		active: ortEp === 'webnn',
-		action: hasMl ? `ORT EP: ${ortEp ?? 'wasm'}` : 'Enable the WebNN flag in chrome://flags'
+		action: hasMl
+			? copy.webnnActionEp.replace('{ep}', ortEp ?? 'wasm')
+			: copy.webnnActionEnable
 	};
 }

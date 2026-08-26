@@ -45,9 +45,9 @@ function formatSize(bytes: number): string {
 	return `${Math.max(1, Math.round(bytes / 1000))} KB`;
 }
 
-function summarize(asset: MediaAssetSnapshot): string {
+function summarize(asset: MediaAssetSnapshot, copy: ReturnType<typeof studioCopy>): string {
 	if (asset.kind === 'image' && asset.video) {
-		return `${asset.video.width}×${asset.video.height} still`;
+		return `${asset.video.width}×${asset.video.height} ${copy.still}`;
 	}
 	if (asset.kind === 'audio' && asset.audio) {
 		return `${asset.audio.channels}ch · ${Math.round(asset.audio.sampleRate / 1000)} kHz`;
@@ -57,59 +57,63 @@ function summarize(asset: MediaAssetSnapshot): string {
 		const rotation = asset.video.rotationDeg ? ` · ${asset.video.rotationDeg}°` : '';
 		return `${asset.video.width}×${asset.video.height}${fps}${rotation}`;
 	}
-	return asset.mimeType ?? 'media';
+	return asset.mimeType ?? copy.mediaFallback;
 }
 
-function proxyLabel(asset: MediaAssetSnapshot): string | null {
+function proxyLabel(asset: MediaAssetSnapshot, copy: ReturnType<typeof studioCopy>): string | null {
 	const proxy = asset.proxy;
 	if (!proxy || proxy.status === 'not-generated' || proxy.status === 'disabled') return null;
 	if (proxy.status === 'recommended') return null;
 	if (proxy.status === 'ready' && proxy.width && proxy.height)
-		return `Proxy ready · ${proxy.width}×${proxy.height}`;
+		return copy.proxyReady.replace('{x}', `${proxy.width}×${proxy.height}`);
 	if (proxy.status === 'generating') {
 		const progress = proxy.progress !== undefined ? ` · ${Math.round(proxy.progress * 100)}%` : '';
-		return `Generating proxy${progress}`;
+		return copy.generatingProxy.replace('{pct}', progress);
 	}
-	return `Proxy ${proxy.status}`;
+	return copy.proxyStatus.replace('{x}', proxy.status);
 }
 
-function mediaBinTitle(asset: MediaAssetSnapshot): string {
+function mediaBinTitle(asset: MediaAssetSnapshot, copy: ReturnType<typeof studioCopy>): string {
 	return [
 		asset.fileName,
-		`${summarize(asset)} · ${formatClock(asset.durationS)} · ${formatSize(asset.byteSize)}`,
+		`${summarize(asset, copy)} · ${formatClock(asset.durationS)} · ${formatSize(asset.byteSize)}`,
 		...mediaTooltipMessages(asset)
 	].join('\n');
 }
 
-function metaRows(asset: MediaAssetSnapshot): { label: string; value: string }[] {
+function metaRows(
+	asset: MediaAssetSnapshot,
+	copy: ReturnType<typeof studioCopy>
+): { label: string; value: string }[] {
 	const rows: { label: string; value: string }[] = [];
 	const v = asset.video;
 	const a = asset.audio;
 	if (v) {
-		rows.push({ label: 'Resolution', value: `${v.width}×${v.height}` });
+		rows.push({ label: copy.resolution, value: `${v.width}×${v.height}` });
 		if (v.frameRate) {
 			const fps =
 				v.frameRate % 1 === 0 ? `${v.frameRate}` : v.frameRate.toFixed(2).replace(/\.?0+$/, '');
-			const mode = v.frameRateMode === 'variable' ? ' (variable)' : '';
-			rows.push({ label: 'Frame rate', value: `${fps} fps${mode}` });
+			const mode = v.frameRateMode === 'variable' ? copy.variableSuffix : '';
+			rows.push({ label: copy.frameRate, value: `${fps} fps${mode}` });
 		}
-		if (v.rotationDeg) rows.push({ label: 'Rotation', value: `${v.rotationDeg}°` });
-		if (v.codec) rows.push({ label: 'Video codec', value: v.codec });
+		if (v.rotationDeg) rows.push({ label: copy.rotation, value: `${v.rotationDeg}°` });
+		if (v.codec) rows.push({ label: copy.videoCodecSettings, value: v.codec });
 	}
 	if (a) {
 		const parts: string[] = [`${a.channels} ch`];
 		if (a.sampleRate) parts.push(`${(a.sampleRate / 1000).toFixed(1)} kHz`);
 		if (a.codec) parts.push(a.codec);
-		rows.push({ label: 'Audio', value: parts.join(' · ') });
+		rows.push({ label: copy.audio, value: parts.join(' · ') });
 	}
-	rows.push({ label: 'Duration', value: formatClock(asset.durationS) });
-	rows.push({ label: 'File size', value: formatSize(asset.byteSize) });
-	if (asset.mimeType) rows.push({ label: 'Type', value: asset.mimeType });
+	rows.push({ label: copy.duration, value: formatClock(asset.durationS) });
+	rows.push({ label: copy.fileSize, value: formatSize(asset.byteSize) });
+	if (asset.mimeType) rows.push({ label: copy.typeLabel, value: asset.mimeType });
 	return rows;
 }
 
 function MetaInfoPopover(props: { asset: MediaAssetSnapshot }) {
-	const proxy = () => proxyLabel(props.asset);
+	const copy = () => studioCopy(studioLocale());
+	const proxy = () => proxyLabel(props.asset, copy());
 	const notes = () => passiveMediaInfoMessages(props.asset);
 	const health = () => userVisibleHealthWarnings(props.asset.health?.warnings ?? []);
 	return (
@@ -117,8 +121,8 @@ function MetaInfoPopover(props: { asset: MediaAssetSnapshot }) {
 			<Popover.Trigger
 				type="button"
 				class="media-bin-button"
-				aria-label={`File details for ${props.asset.fileName}`}
-				title="Show file details"
+				aria-label={copy().fileDetailsForX.replace('{x}', props.asset.fileName)}
+				title={copy().showFileDetails}
 			>
 				<Info size={13} aria-hidden="true" />
 			</Popover.Trigger>
@@ -126,18 +130,18 @@ function MetaInfoPopover(props: { asset: MediaAssetSnapshot }) {
 				<Popover.Positioner>
 					<Popover.Content
 						class="media-info-popover panel"
-						aria-label={`File details for ${props.asset.fileName}`}
+						aria-label={copy().fileDetailsForX.replace('{x}', props.asset.fileName)}
 					>
 						<Popover.CloseTrigger
 							class="media-info-close"
-							aria-label="Close file details"
-							title="Close file details"
+							aria-label={copy().closeFileDetails}
+							title={copy().closeFileDetails}
 						>
 							<X size={12} aria-hidden="true" />
 						</Popover.CloseTrigger>
 						<p class="media-info-filename">{props.asset.fileName}</p>
 						<dl class="media-info-rows">
-							<For each={metaRows(props.asset)}>
+							<For each={metaRows(props.asset, copy())}>
 								{(row) => (
 									<>
 										<dt class="media-info-label">{row.label}</dt>
@@ -252,11 +256,7 @@ export function MediaBin(props: MediaBinProps) {
 			</header>
 			<Show
 				when={props.assets().length > 0}
-				fallback={
-					<p class="media-bin-empty">
-						{copy().dropHere}
-					</p>
-				}
+				fallback={<p class="media-bin-empty">{copy().dropHere}</p>}
 			>
 				<ul class="media-bin-list">
 					<For each={props.assets()}>
@@ -275,7 +275,7 @@ export function MediaBin(props: MediaBinProps) {
 										event.dataTransfer.setData(ASSET_DRAG_MIME, asset.sourceId);
 										event.dataTransfer.effectAllowed = 'copy';
 									}}
-									title={mediaBinTitle(asset)}
+									title={mediaBinTitle(asset, copy())}
 								>
 									<BinThumbnail
 										asset={asset}
@@ -296,9 +296,9 @@ export function MediaBin(props: MediaBinProps) {
 											<span class="media-bin-name-text">{asset.fileName}</span>
 										</span>
 										<span class="media-bin-sub">
-											{summarize(asset)} · {formatClock(asset.durationS)} ·{' '}
+											{summarize(asset, copy())} · {formatClock(asset.durationS)} ·{' '}
 											{formatSize(asset.byteSize)}
-											<Show when={offline()}> · offline</Show>
+											<Show when={offline()}> · {copy().offline}</Show>
 										</span>
 									</div>
 									<div class="media-bin-actions">
@@ -308,8 +308,8 @@ export function MediaBin(props: MediaBinProps) {
 											class="media-bin-button"
 											onClick={() => props.onPlace(asset.sourceId)}
 											disabled={offline() || blocked()}
-											aria-label={`Add ${asset.fileName} to timeline`}
-											title="Add to timeline"
+											aria-label={copy().addXToTimeline.replace('{x}', asset.fileName)}
+											title={copy().addToTimeline}
 										>
 											<Plus size={13} aria-hidden="true" />
 										</button>
@@ -317,8 +317,8 @@ export function MediaBin(props: MediaBinProps) {
 											type="button"
 											class="media-bin-button is-danger"
 											onClick={() => props.onRemove(asset.sourceId)}
-											aria-label={`Remove ${asset.fileName} from bin`}
-											title="Remove from bin"
+											aria-label={copy().removeXFromBin.replace('{x}', asset.fileName)}
+											title={copy().removeFromBin}
 										>
 											<Trash2 size={13} aria-hidden="true" />
 										</button>

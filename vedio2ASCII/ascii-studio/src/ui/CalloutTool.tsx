@@ -7,14 +7,7 @@
 import { createSignal, Show, For } from 'solid-js';
 import { MousePointer2 } from 'lucide-solid';
 import type { CalloutKind } from '../protocol';
-
-const CALLOUT_KINDS: { kind: CalloutKind; label: string }[] = [
-	{ kind: 'arrow', label: 'Arrow' },
-	{ kind: 'box', label: 'Box' },
-	{ kind: 'step', label: 'Step' },
-	{ kind: 'spotlight', label: 'Spotlight' },
-	{ kind: 'blur', label: 'Blur' }
-];
+import { studioCopy, studioLocale } from './locale';
 
 interface CalloutToolProps {
 	active: boolean;
@@ -25,6 +18,14 @@ interface CalloutToolProps {
 }
 
 export function CalloutTool(props: CalloutToolProps) {
+	const copy = () => studioCopy(studioLocale());
+	const CALLOUT_KINDS: { kind: CalloutKind; label: string }[] = [
+		{ kind: 'arrow', label: copy().calloutArrow },
+		{ kind: 'box', label: copy().calloutBox },
+		{ kind: 'step', label: copy().calloutStep },
+		{ kind: 'spotlight', label: copy().calloutSpotlight },
+		{ kind: 'blur', label: copy().calloutBlur }
+	];
 	const [selectedKind, setSelectedKind] = createSignal<CalloutKind>('arrow');
 	const [showPicker, setShowPicker] = createSignal(false);
 
@@ -54,8 +55,8 @@ export function CalloutTool(props: CalloutToolProps) {
 				class={`pipeline-chip pipeline-chip-button ${props.active ? 'is-ok' : ''}`}
 				onClick={handleToolbarClick}
 				disabled={isDisabled()}
-				title={isDisabled() ? 'Requires WebGPU (accelerated tier)' : 'Callout tool'}
-				aria-label="Callout tool"
+				title={isDisabled() ? copy().requiresWebGPU : copy().calloutTool}
+				aria-label={copy().calloutTool}
 			>
 				<MousePointer2 size={13} aria-hidden="true" />
 			</button>
@@ -64,7 +65,7 @@ export function CalloutTool(props: CalloutToolProps) {
 				<div
 					class="callout-kind-picker"
 					role="listbox"
-					aria-label="Select callout kind"
+					aria-label={copy().selectCalloutKind}
 					onKeyDown={(e) => {
 						if (e.key === 'Escape') {
 							setShowPicker(false);

@@ -25,7 +25,8 @@ interface BundleDialogProps {
 	lastMessage: string | null;
 }
 
-const DIRECTORY_PERMISSION_DENIED_MESSAGE = 'Directory access was not granted.';
+const DIRECTORY_PERMISSION_DENIED_MESSAGE = () =>
+	studioCopy(studioLocale()).bundlePermissionDenied;
 
 async function pickDirectory(
 	mode: 'read' | 'readwrite'
@@ -38,7 +39,7 @@ async function pickDirectory(
 		const handle = await picker();
 		if (mode === 'readwrite' && handle.requestPermission) {
 			const status = await handle.requestPermission({ mode: 'readwrite' });
-			if (status !== 'granted') throw new Error(DIRECTORY_PERMISSION_DENIED_MESSAGE);
+			if (status !== 'granted') throw new Error(DIRECTORY_PERMISSION_DENIED_MESSAGE());
 		}
 		return handle;
 	} catch (error) {
@@ -98,8 +99,8 @@ export function BundleDialog(props: BundleDialogProps) {
 				disabled={props.disabled || !props.directoryPickerAvailable}
 				title={
 					props.directoryPickerAvailable
-						? 'Export, import, or collect project media'
-						: 'Project bundles require a Chromium directory picker'
+						? copy().bundleTriggerTitle
+						: copy().bundlePickerTitle
 				}
 			>
 				<FolderArchive size={14} aria-hidden="true" />
@@ -107,15 +108,13 @@ export function BundleDialog(props: BundleDialogProps) {
 			</Popover.Trigger>
 			<Portal>
 				<Popover.Positioner>
-					<Popover.Content class="export-popover bundle-popover panel" aria-label="Project bundle">
+					<Popover.Content class="export-popover bundle-popover panel" aria-label={copy().projectBundle}>
 						<div class="export-popover-header">
 							<h2 class="export-popover-title">
-								Project bundle{' '}
-								<span class="text-xs text-muted-foreground font-normal">(Experimental)</span>
+								{copy().projectBundle}{' '}
+								<span class="text-xs text-muted-foreground font-normal">({copy().experimental})</span>
 							</h2>
-							<p class="export-popover-subtitle">
-								Move projects between browsers with a portable folder bundle.
-							</p>
+							<p class="export-popover-subtitle">{copy().bundleSubtitle}</p>
 						</div>
 						<div class="bundle-actions">
 							<Button
@@ -123,20 +122,20 @@ export function BundleDialog(props: BundleDialogProps) {
 								disabled={props.busy}
 								onClick={() => void runExport({ mode: 'embed-media' })}
 							>
-								<FolderOutput size={14} aria-hidden="true" />
-								Export project…
-							</Button>
+<FolderOutput size={14} aria-hidden="true" />
+									{copy().exportProject}
+								</Button>
 							<Button
 								variant="outline"
 								disabled={props.busy}
 								onClick={() => void runExport({ mode: 'reference-only' })}
 							>
-								Export references only
-							</Button>
+{copy().exportReferencesOnly}
+								</Button>
 							<Button variant="outline" disabled={props.busy} onClick={() => void runImport()}>
-								<FolderInput size={14} aria-hidden="true" />
-								Import project…
-							</Button>
+<FolderInput size={14} aria-hidden="true" />
+									{copy().importProject}
+								</Button>
 							<label class="bundle-collect-row">
 								<input
 									type="checkbox"
@@ -144,12 +143,12 @@ export function BundleDialog(props: BundleDialogProps) {
 									onChange={(event) => setRelocate(event.currentTarget.checked)}
 									disabled={props.busy}
 								/>
-								Relocate in-editor paths after collect
-							</label>
+{copy().relocatePaths}
+								</label>
 							<Button variant="outline" disabled={props.busy} onClick={() => void runCollect()}>
-								<FolderArchive size={14} aria-hidden="true" />
-								Collect media…
-							</Button>
+<FolderArchive size={14} aria-hidden="true" />
+									{copy().collectMedia}
+								</Button>
 						</div>
 						<Show
 							when={
@@ -164,18 +163,18 @@ export function BundleDialog(props: BundleDialogProps) {
 								<Show when={pickerError()}>
 									<p class="is-warn">{pickerError()}</p>
 								</Show>
-								<Show when={props.busy && props.progressPhase}>
-									<p>Working… {props.progressPhase}</p>
-								</Show>
+<Show when={props.busy && props.progressPhase}>
+										<p>{copy().workingPhase.replace('{phase}', props.progressPhase ?? '')}</p>
+									</Show>
 								<Show when={props.lastMessage}>
 									<p>{props.lastMessage}</p>
 								</Show>
 								<Show when={props.integrityReport}>
 									{(report) => (
 										<div class="bundle-integrity">
-											<p class={report().ok ? 'is-ok' : 'is-warn'}>
-												{report().ok ? 'Bundle integrity OK' : 'Bundle integrity issues'}
-											</p>
+<p class={report().ok ? 'is-ok' : 'is-warn'}>
+													{report().ok ? copy().bundleIntegrityOk : copy().bundleIntegrityIssues}
+												</p>
 											<ul>
 												<For
 													each={report()
@@ -188,11 +187,11 @@ export function BundleDialog(props: BundleDialogProps) {
 										</div>
 									)}
 								</Show>
-								<Show when={props.busy}>
-									<Button variant="ghost" onClick={() => props.onCancelJob()}>
-										Cancel
-									</Button>
-								</Show>
+<Show when={props.busy}>
+										<Button variant="ghost" onClick={() => props.onCancelJob()}>
+											{copy().cancel}
+										</Button>
+									</Show>
 							</div>
 						</Show>
 					</Popover.Content>

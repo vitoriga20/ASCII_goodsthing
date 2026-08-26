@@ -6,6 +6,7 @@
 
 import { For, createMemo } from 'solid-js';
 import type { HDRWarningSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 export interface ColourInspectorProps {
 	primaries: string | null;
@@ -17,32 +18,28 @@ export interface ColourInspectorProps {
 }
 
 export default function ColourInspector(props: ColourInspectorProps) {
+	const copy = () => studioCopy(studioLocale());
 	const hasMetadata = createMemo(() => props.origin !== null && props.origin !== 'none');
 	const hasWarnings = createMemo(() => props.warnings.length > 0);
 
 	return (
 		<section class="inspector-section colour-section">
-			<h3 class="inspector-heading">Colour</h3>
+			<h3 class="inspector-heading">{copy().colour}</h3>
 
-			{!hasMetadata() && !hasWarnings() && (
-				<p class="colour-none">
-					No colour space metadata — source doesn&apos;t declare primaries or transfer
-					characteristics.
-				</p>
-			)}
+			{!hasMetadata() && !hasWarnings() && <p class="colour-none">{copy().noColourMetadata}</p>}
 
 			{hasMetadata() && (
 				<dl class="colour-metadata">
-					<dt>Origin</dt>
+					<dt>{copy().origin}</dt>
 					<dd>{props.origin}</dd>
-					<dt>Primaries</dt>
-					<dd>{props.primaries ?? 'Unknown'}</dd>
-					<dt>Transfer</dt>
-					<dd>{props.transfer ?? 'Unknown'}</dd>
-					<dt>Matrix</dt>
-					<dd>{props.matrix ?? 'Unknown'}</dd>
-					<dt>Range</dt>
-					<dd>{props.fullRange ? 'Full' : 'Limited'}</dd>
+					<dt>{copy().primaries}</dt>
+					<dd>{props.primaries ?? copy().unknown}</dd>
+					<dt>{copy().transfer}</dt>
+					<dd>{props.transfer ?? copy().unknown}</dd>
+					<dt>{copy().matrix}</dt>
+					<dd>{props.matrix ?? copy().unknown}</dd>
+					<dt>{copy().range}</dt>
+					<dd>{props.fullRange ? copy().full : copy().limited}</dd>
 				</dl>
 			)}
 

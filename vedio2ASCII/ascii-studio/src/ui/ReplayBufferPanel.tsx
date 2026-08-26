@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js';
 import { Circle, Save, Video, VideoOff, Clock } from 'lucide-solid';
 import { Button } from './components/button';
+import { studioCopy, studioLocale } from './locale';
 import type { CaptureSessionState, RingBufferState } from '../protocol';
 
 export interface ReplayBufferPanelProps {
@@ -17,6 +18,7 @@ export interface ReplayBufferPanelProps {
 }
 
 export function ReplayBufferPanel(props: ReplayBufferPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [expanded, setExpanded] = createSignal(props.initiallyExpanded ?? false);
 
 	const isCapturing = () => props.captureState?.active ?? false;
@@ -45,11 +47,11 @@ export function ReplayBufferPanel(props: ReplayBufferPanelProps) {
 				aria-expanded={expanded()}
 				aria-controls={expanded() ? 'replay-buffer-body' : undefined}
 			>
-				<span class="panel-title">Replay Buffer</span>
+				<span class="panel-title">{copy().replayBufferTitle}</span>
 				<Show when={isCapturing()}>
-					<span class="recording-indicator" aria-label="Recording">
+					<span class="recording-indicator" aria-label={copy().recordingIndicator}>
 						<Circle size={10} fill="var(--destructive)" color="var(--destructive)" />
-						<span>Recording</span>
+						<span>{copy().recordingIndicator}</span>
 					</span>
 				</Show>
 			</button>
@@ -58,7 +60,7 @@ export function ReplayBufferPanel(props: ReplayBufferPanelProps) {
 				<div class="collapse-body" id="replay-buffer-body">
 					<Show when={!props.isSupported}>
 						<div class="capability-warning" role="alert">
-							{props.supportedReason ?? 'Replay Buffer is not available in this browser.'}
+							{props.supportedReason ?? copy().replayBufferUnavailable}
 						</div>
 					</Show>
 
@@ -66,19 +68,19 @@ export function ReplayBufferPanel(props: ReplayBufferPanelProps) {
 						<div class="capture-controls">
 							<Show when={!isCapturing()}>
 								<Button variant="default" onClick={() => props.onStartCapture('display')}>
-									<Video size={16} /> Start Capture
+									<Video size={16} /> {copy().startCapture}
 								</Button>
 							</Show>
 							<Show when={isCapturing()}>
 								<Button variant="destructive" onClick={() => props.onStopCapture()}>
-									<VideoOff size={16} /> Stop Capture
+									<VideoOff size={16} /> {copy().stopCapture}
 								</Button>
 							</Show>
 						</div>
 
 						<Show when={isCapturing()}>
 							<div class="capture-status">
-								<div class="elapsed-time" aria-label="Elapsed time">
+								<div class="elapsed-time" aria-label={copy().elapsedTime}>
 									<Clock size={14} />
 									<span style={{ 'font-variant-numeric': 'tabular-nums' }}>{elapsed()}</span>
 								</div>
@@ -98,19 +100,21 @@ export function ReplayBufferPanel(props: ReplayBufferPanelProps) {
 
 							<div class="save-controls">
 								<Button
-									variant="secondary"
-									onClick={() => props.onSaveLastN()}
-									disabled={props.saveInProgress || !bufferPercent()}
-									aria-label={`Save last ${saveSeconds()} seconds`}
-								>
-									<Save size={16} />
-									{props.saveInProgress ? 'Saving…' : `Save Last ${saveSeconds()}s`}
-								</Button>
+								variant="secondary"
+								onClick={() => props.onSaveLastN()}
+								disabled={props.saveInProgress || !bufferPercent()}
+								aria-label={copy().saveLastAria.replace('{n}', String(saveSeconds()))}
+							>
+								<Save size={16} />
+								{props.saveInProgress
+									? copy().saving
+									: copy().saveLastNs.replace('{n}', String(saveSeconds()))}
+							</Button>
 							</div>
 						</Show>
 
 						<Show when={!props.crossOriginIsolated}>
-							<div class="capability-note">Live audio chain requires cross-origin isolation.</div>
+							<div class="capability-note">{copy().liveAudioChainNeedsCoI}</div>
 						</Show>
 					</Show>
 				</div>

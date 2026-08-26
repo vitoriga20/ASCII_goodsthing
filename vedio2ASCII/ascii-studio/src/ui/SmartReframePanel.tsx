@@ -11,6 +11,7 @@ import { X } from 'lucide-solid';
 import { Button } from './components/button';
 import type { ReframeTargetAspect } from '../protocol';
 import type { ReframeControllerState } from './reframe-controller';
+import { studioCopy, studioLocale } from './locale';
 
 export interface ReframeAnalyseSettings {
 	targetAspect: ReframeTargetAspect;
@@ -45,6 +46,7 @@ function formatPercent(value: number): string {
 
 export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 	let panelRef: HTMLElement | undefined;
+	const copy = () => studioCopy(studioLocale());
 	const [targetAspect, setTargetAspect] = createSignal<ReframeTargetAspect>('9:16');
 	const [velocityBound, setVelocityBound] = createSignal(0.3);
 	const [accelerationBound, setAccelerationBound] = createSignal(0.5);
@@ -114,18 +116,16 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="smart-reframe-panel-title">
-							Smart Reframe (Experimental)
+							{copy().smartReframeTitle}
 						</p>
-						<p class="capability-panel-tier">
-							Generates editable transform keyframes on-device — no frames leave your browser.
-						</p>
+						<p class="capability-panel-tier">{copy().smartReframeDesc}</p>
 					</div>
 					<Button
 						size="icon"
 						variant="ghost"
 						onClick={() => props.onClose()}
-						aria-label="Close Smart Reframe panel"
-						title="Close Smart Reframe panel"
+						aria-label={copy().closeSmartReframePanel}
+						title={copy().closeSmartReframePanel}
 					>
 						<X size={16} aria-hidden="true" />
 					</Button>
@@ -134,24 +134,24 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 				{/* Capability notices */}
 				<Show when={!props.workerAvailable}>
 					<p class="capability-panel-note" role="alert">
-						Analysis worker unavailable in this browser.
+						{copy().analysisWorkerUnavailable}
 					</p>
 				</Show>
 
 				{/* Face model — downloaded on explicit action (Phase 28/29 pattern). */}
 				<Show when={props.workerAvailable && props.faceDetectionSupported}>
 					<section class="diagnostics-section">
-						<h2>Face detection</h2>
+						<h2>{copy().faceDetection}</h2>
 						<Show
 							when={faceModelStatus() === 'loaded'}
 							fallback={
 								<>
 									<p class="capability-panel-note">
 										{faceModelStatus() === 'loading'
-											? 'Loading the face model…'
+											? copy().loadingFaceModel
 											: faceModelStatus() === 'failed'
-												? (props.state.faceModelError ?? 'Face model failed to load.')
-												: 'Using visual saliency. Load the optional ONNX face detector for face-aware reframing.'}
+												? (props.state.faceModelError ?? copy().faceModelFailed)
+												: copy().saliencyFallback}
 									</p>
 									<Button
 										size="sm"
@@ -159,23 +159,24 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 										disabled={faceModelStatus() === 'loading'}
 										onClick={() => props.onLoadFaceModel()}
 									>
-										{faceModelStatus() === 'failed' ? 'Retry load' : 'Load face model'}
+										{faceModelStatus() === 'failed' ? copy().retryLoad : copy().loadFaceModel}
 									</Button>
 								</>
 							}
 						>
 							<p class="capability-panel-note">
-								Face detection ready
-								{faceEngineLabel() ? ` (${faceEngineLabel()}).` : '.'}
+								{faceEngineLabel()
+									? copy().faceDetectionReadyEngined.replace('{engine}', faceEngineLabel()!)
+									: copy().faceDetectionReadyPlain}
 							</p>
 						</Show>
 					</section>
 				</Show>
 
 				<section class="diagnostics-section">
-					<h2>Target</h2>
+					<h2>{copy().targetLabel}</h2>
 					<div style={{ display: 'flex', 'align-items': 'center', gap: '0.5rem' }}>
-						<label for="reframe-aspect">Aspect ratio</label>
+						<label for="reframe-aspect">{copy().aspectRatio}</label>
 						<select
 							id="reframe-aspect"
 							value={targetAspect()}
@@ -188,12 +189,12 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 						</select>
 					</div>
 					<Show when={!props.selectedClip}>
-						<p class="capability-panel-note">Select a video clip on the timeline to reframe.</p>
+						<p class="capability-panel-note">{copy().selectClipToReframe}</p>
 					</Show>
 				</section>
 
 				<section class="diagnostics-section">
-					<h2>Analyse</h2>
+					<h2>{copy().analyse}</h2>
 					<Show
 						when={busy()}
 						fallback={
@@ -201,20 +202,23 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 								size="sm"
 								disabled={!props.selectedClip || !props.workerAvailable}
 								onClick={handleAnalyse}
-								aria-label="Analyse clip for Smart Reframe"
+								aria-label={copy().analyseAria}
 							>
-								Analyse
+								{copy().analyse}
 							</Button>
 						}
 					>
 						<p class="capability-panel-note" aria-live="polite">
 							{status() === 'resolving'
-								? 'Loading source…'
-								: `Analysing… ${formatPercent(props.state.progress)} (${props.state.framesProcessed}/${props.state.totalFrames})`}
+								? copy().loadingSource
+								: copy()
+										.analysingProgress.replace('{percent}', formatPercent(props.state.progress))
+										.replace('{done}', String(props.state.framesProcessed))
+										.replace('{total}', String(props.state.totalFrames))}
 							<progress
 								value={props.state.progress}
 								max={1}
-								aria-label="Analysis progress"
+								aria-label={copy().analysisProgressAria}
 								style={{
 									width: '100%',
 									display: 'block',
@@ -223,21 +227,21 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 							/>
 						</p>
 						<Button size="sm" variant="secondary" onClick={() => props.onCancel()}>
-							Cancel
+							{copy().cancel}
 						</Button>
 					</Show>
 
 					{/* Confirm replace dialog (R6.8) */}
 					<Show when={confirmReplace()}>
 						<p class="capability-panel-note" role="alert">
-							This clip already has transform keyframes. Re-analysis will overwrite them.
+							{copy().keyframesOverwriteWarning}
 						</p>
 						<div style={{ display: 'flex', gap: '0.5rem' }}>
 							<Button size="sm" variant="destructive" onClick={handleReanalyse}>
-								Replace keyframes
+								{copy().replaceKeyframes}
 							</Button>
 							<Button size="sm" variant="secondary" onClick={() => setConfirmReplace(false)}>
-								Keep existing
+								{copy().keepExisting}
 							</Button>
 						</div>
 					</Show>
@@ -255,38 +259,35 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 						const stats = () => props.state.stats!;
 						return (
 							<section class="diagnostics-section">
-								<h2>Review</h2>
+								<h2>{copy().review}</h2>
 								<dl class="diagnostics-grid">
 									<div>
-										<dt>Mode</dt>
+										<dt>{copy().mode}</dt>
 										<dd>{stats().mode}</dd>
 									</div>
 									<div>
-										<dt>Frames analysed</dt>
+										<dt>{copy().framesAnalysed}</dt>
 										<dd>{stats().framesAnalysed}</dd>
 									</div>
 									<div>
-										<dt>Faces detected</dt>
+										<dt>{copy().facesDetected}</dt>
 										<dd>{stats().facesDetected}</dd>
 									</div>
 									<div>
-										<dt>Shot boundaries</dt>
+										<dt>{copy().shotBoundaries}</dt>
 										<dd>{stats().shotBoundaries}</dd>
 									</div>
 									<div>
-										<dt>Keyframes generated</dt>
+										<dt>{copy().keyframesGenerated}</dt>
 										<dd>{stats().keyframesGenerated}</dd>
 									</div>
 									<div>
-										<dt>Safe zone compliance</dt>
+										<dt>{copy().safeZoneCompliance}</dt>
 										<dd>{formatPercent(stats().safeZoneCompliance)}</dd>
 									</div>
 								</dl>
 								<Show when={stats().safeZoneCompliance < 0.95}>
-									<p class="capability-panel-note">
-										The subject leaves the safe zone in some frames; widen the bounds in Adjust or
-										edit the keyframes by hand after applying.
-									</p>
+									<p class="capability-panel-note">{copy().safeZoneWarning}</p>
 								</Show>
 
 								<div
@@ -297,17 +298,17 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 									}}
 								>
 									<Button size="sm" onClick={() => props.onApply()}>
-										Apply
+										{copy().apply}
 									</Button>
 									<Button size="sm" variant="secondary" onClick={() => props.onDiscard()}>
-										Discard
+										{copy().discard}
 									</Button>
 									<Button
 										size="sm"
 										variant="secondary"
 										onClick={() => setShowAdjust(!showAdjust())}
 									>
-										Adjust
+										{copy().adjust}
 									</Button>
 								</div>
 
@@ -322,7 +323,7 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 										}}
 									>
 										<label for="reframe-velocity">
-											Velocity bound ({velocityBound().toFixed(2)} /s)
+											{copy().velocityBound.replace('{v}', velocityBound().toFixed(2))}
 										</label>
 										<input
 											id="reframe-velocity"
@@ -334,7 +335,7 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 											onInput={(e) => setVelocityBound(parseFloat(e.currentTarget.value))}
 										/>
 										<label for="reframe-accel">
-											Acceleration bound ({accelerationBound().toFixed(2)} /s²)
+											{copy().accelerationBound.replace('{v}', accelerationBound().toFixed(2))}
 										</label>
 										<input
 											id="reframe-accel"
@@ -345,7 +346,9 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 											value={accelerationBound()}
 											onInput={(e) => setAccelerationBound(parseFloat(e.currentTarget.value))}
 										/>
-										<label for="reframe-fps">Analysis rate ({analysisFps()} fps)</label>
+										<label for="reframe-fps">
+											{copy().analysisRate.replace('{v}', String(analysisFps()))}
+										</label>
 										<input
 											id="reframe-fps"
 											type="range"
@@ -356,7 +359,7 @@ export const SmartReframePanel: Component<SmartReframePanelProps> = (props) => {
 											onInput={(e) => setAnalysisFps(parseInt(e.currentTarget.value, 10))}
 										/>
 										<Button size="sm" onClick={handleReanalyse}>
-											Re-analyse
+											{copy().reanalyse}
 										</Button>
 									</div>
 								</Show>

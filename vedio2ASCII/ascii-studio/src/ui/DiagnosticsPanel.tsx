@@ -12,6 +12,7 @@ import {
 import { copyToClipboard } from '../lib/clipboard';
 import { formatBytes } from '../lib/format';
 import { Button } from './components/button';
+import { studioCopy, studioLocale } from './locale';
 
 interface DiagnosticsPanelProps {
 	open: boolean;
@@ -37,8 +38,11 @@ function budgetClass(budget: PerformanceBudget): string {
 	}
 }
 
-function observedBudgetValue(budget: PerformanceBudget): string {
-	if (budget.observed === null) return 'Not measured';
+function observedBudgetValue(
+	budget: PerformanceBudget,
+	copy: ReturnType<typeof studioCopy>
+): string {
+	if (budget.observed === null) return copy.notMeasured;
 	if (budget.unit === 'bytes') return formatBytes(budget.observed);
 	if (budget.unit === 'percent') return `${budget.observed.toFixed(1)}%`;
 	return `${budget.observed.toFixed(Number.isInteger(budget.observed) ? 0 : 2)} ${budget.unit}`;
@@ -54,6 +58,7 @@ function formatMs(ms: number): string {
 
 export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 	let panelRef: HTMLElement | undefined;
+	const copy = () => studioCopy(studioLocale());
 	const [copyStatus, setCopyStatus] = createSignal<string | null>(null);
 
 	createEffect(() => {
@@ -71,7 +76,11 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 		const text = reportText();
 		if (!text) return;
 		const result = await copyToClipboard(text);
-		setCopyStatus(result.ok ? 'Diagnostics report copied.' : `Copy failed: ${result.error}`);
+		setCopyStatus(
+			result.ok
+				? copy().diagnosticsReportCopied
+				: copy().copyFailed.replace('{x}', String(result.error))
+		);
 	}
 
 	return (
@@ -116,11 +125,11 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="diagnostics-panel-title">
-							Diagnostics
+							{copy().diagnostics}
 						</p>
 						<p class="capability-panel-tier">
-							<Show when={props.snapshot} fallback="Couldn't capture a snapshot">
-								{(snapshot) => <>Active tier: {snapshot().capability.tier}</>}
+							<Show when={props.snapshot} fallback={copy().couldntCaptureSnapshot}>
+								{(snapshot) => <>{copy().activeTier.replace('{x}', snapshot().capability.tier)}</>}
 							</Show>
 						</p>
 					</div>
@@ -129,8 +138,8 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							size="icon"
 							variant="ghost"
 							onClick={props.onRefresh}
-							aria-label="Refresh diagnostics"
-							title="Refresh diagnostics"
+							aria-label={copy().refreshDiagnostics}
+							title={copy().refreshDiagnostics}
 						>
 							<RefreshCw size={16} aria-hidden="true" />
 						</Button>
@@ -138,8 +147,8 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							size="icon"
 							variant="ghost"
 							onClick={copyReport}
-							aria-label="Copy diagnostics report"
-							title="Copy diagnostics report"
+							aria-label={copy().copyDiagnosticsReport}
+							title={copy().copyDiagnosticsReport}
 						>
 							<Clipboard size={16} aria-hidden="true" />
 						</Button>
@@ -147,8 +156,8 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							size="icon"
 							variant="ghost"
 							onClick={props.onClose}
-							aria-label="Close diagnostics panel"
-							title="Close diagnostics panel"
+							aria-label={copy().closeDiagnosticsPanel}
+							title={copy().closeDiagnosticsPanel}
 						>
 							<X size={16} aria-hidden="true" />
 						</Button>
@@ -157,12 +166,12 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 
 				<Show
 					when={props.snapshot}
-					fallback={<p class="capability-panel-note">Requesting diagnostics...</p>}
+					fallback={<p class="capability-panel-note">{copy().requestingDiagnostics}</p>}
 				>
 					{(snapshot) => (
 						<>
 							<section class="diagnostics-section">
-								<h2>Capability</h2>
+								<h2>{copy().capabilitySection}</h2>
 								<p>{snapshot().capability.tierReason}</p>
 								<ul class="diagnostics-list">
 									<For each={snapshot().capability.findings}>
@@ -183,20 +192,22 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>GPU + Codecs</h2>
+								<h2>{copy().gpuAndCodecs}</h2>
 								<dl class="diagnostics-grid">
 									<div>
-										<dt>WebGPU</dt>
+										<dt>{copy().webGpu}</dt>
 										<dd>{snapshot().capability.webGpu.status}</dd>
 									</div>
 									<div>
-										<dt>Features</dt>
-										<dd>{snapshot().capability.webGpu.features.join(', ') || 'default'}</dd>
+										<dt>{copy().featuresLabel}</dt>
+										<dd>
+											{snapshot().capability.webGpu.features.join(', ') || copy().detailsDefault}
+										</dd>
 									</div>
 									<Show when={snapshot().capability.webGpu.lastDeviceLost}>
 										{(lost) => (
 											<div>
-												<dt>Last device lost</dt>
+												<dt>{copy().lastDeviceLost}</dt>
 												<dd>
 													{lost().reason}: {lost().message}
 												</dd>
@@ -206,7 +217,7 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 									<Show when={snapshot().capability.webGpu.limits}>
 										{(limits) => (
 											<div>
-												<dt>Limits</dt>
+												<dt>{copy().limitsLabel}</dt>
 												<dd>
 													{Object.entries(limits())
 														.map(([k, v]) => `${k}=${v}`)
@@ -216,50 +227,62 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 										)}
 									</Show>
 									<div>
-										<dt>Decode</dt>
+										<dt>{copy().decodeLabel}</dt>
 										<dd>
 											{snapshot()
 												.capability.webCodecs.decoders.map(
-													(c) => `${c.codec}${c.supported ? '' : ' (unsupported)'}`
+													(c) => `${c.codec}${c.supported ? '' : copy().statusUnsupportedSuffix}`
 												)
-												.join(', ') || 'none'}
+												.join(', ') || copy().detailsNone}
 										</dd>
 									</div>
 									<div>
-										<dt>Encode</dt>
+										<dt>{copy().encodeLabel}</dt>
 										<dd>
 											{snapshot()
 												.capability.webCodecs.encoders.map(
-													(c) => `${c.codec}${c.supported ? '' : ' (unsupported)'}`
+													(c) => `${c.codec}${c.supported ? '' : copy().statusUnsupportedSuffix}`
 												)
-												.join(', ') || 'none'}
+												.join(', ') || copy().detailsNone}
 										</dd>
 									</div>
 									<Show when={snapshot().capability.formatCompatibility}>
 										{(compat) => (
 											<>
 												<div>
-													<dt>Video codecs</dt>
+													<dt>{copy().videoCodecs}</dt>
 													<dd>
-														{compat().supportedVideoCodecs}/{compat().totalVideoCodecs} supported (
-														{compat().hwPreferredVideoCodecs} hardware) ·{' '}
+														{copy()
+															.codecCountSupported.replace(
+																'{a}',
+																String(compat().supportedVideoCodecs)
+															)
+															.replace('{b}', String(compat().totalVideoCodecs))
+															.replace('{c}', String(compat().hwPreferredVideoCodecs))}{' '}
+														·{' '}
 														{compat()
 															.videoCodecs.map((c) => `${c.codec}: ${c.strategy}`)
-															.join(', ') || 'none'}
+															.join(', ') || copy().detailsNone}
 													</dd>
 												</div>
 												<div>
-													<dt>Audio codecs</dt>
+													<dt>{copy().audioCodecs}</dt>
 													<dd>
-														{compat().supportedAudioCodecs}/{compat().totalAudioCodecs} supported ·{' '}
+														{copy()
+															.audioCodecCountSupported.replace(
+																'{a}',
+																String(compat().supportedAudioCodecs)
+															)
+															.replace('{b}', String(compat().totalAudioCodecs))}{' '}
+														·{' '}
 														{compat()
 															.audioCodecs.map((c) => `${c.codec}: ${c.strategy}`)
-															.join(', ') || 'none'}
+															.join(', ') || copy().detailsNone}
 													</dd>
 												</div>
 												<div>
-													<dt>Containers</dt>
-													<dd>{compat().demuxableContainers.join(', ') || 'none'}</dd>
+													<dt>{copy().containers}</dt>
+													<dd>{compat().demuxableContainers.join(', ') || copy().detailsNone}</dd>
 												</div>
 											</>
 										)}
@@ -268,22 +291,26 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Storage + Cache</h2>
+								<h2>{copy().storageAndCache}</h2>
 								<dl class="diagnostics-grid">
 									<div>
-										<dt>Usage</dt>
+										<dt>{copy().usageLabel}</dt>
 										<dd>{formatBytes(snapshot().storage.usageBytes)}</dd>
 									</div>
 									<div>
-										<dt>Quota</dt>
+										<dt>{copy().quotaLabel}</dt>
 										<dd>{formatBytes(snapshot().storage.quotaBytes)}</dd>
 									</div>
 									<div>
-										<dt>OPFS</dt>
-										<dd>{snapshot().storage.opfsSupported ? 'available' : 'unavailable'}</dd>
+										<dt>{copy().opfsLabel}</dt>
+										<dd>
+											{snapshot().storage.opfsSupported
+												? copy().statusAvailable
+												: copy().statusUnavailable}
+										</dd>
 									</div>
 									<div>
-										<dt>Cache</dt>
+										<dt>{copy().cacheLabel}</dt>
 										<dd>
 											{snapshot().proxyCache.status} ·{' '}
 											{formatBytes(snapshot().proxyCache.estimatedBytes)}
@@ -293,34 +320,34 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Voice Cleanup</h2>
+								<h2>{copy().voiceCleanup}</h2>
 								<dl class="diagnostics-grid">
 									<div>
-										<dt>Denoiser tracks</dt>
+										<dt>{copy().denoiserTracks}</dt>
 										<dd>{snapshot().voiceCleanup.denoiserEnabledTrackCount}</dd>
 									</div>
 									<div>
-										<dt>WASM</dt>
+										<dt>{copy().wasmLabel}</dt>
 										<dd>{snapshot().voiceCleanup.wasmProvenance}</dd>
 									</div>
 									<div>
-										<dt>WASM status</dt>
+										<dt>{copy().wasmStatus}</dt>
 										<dd>{snapshot().voiceCleanup.wasmLoadStatus}</dd>
 									</div>
 									<div>
-										<dt>Checksum</dt>
-										<dd>{snapshot().voiceCleanup.wasmSha256 ?? 'not verified yet'}</dd>
+										<dt>{copy().checksum}</dt>
+										<dd>{snapshot().voiceCleanup.wasmSha256 ?? copy().notVerifiedYet}</dd>
 									</div>
 									<div>
-										<dt>Latency</dt>
+										<dt>{copy().latency}</dt>
 										<dd>{snapshot().voiceCleanup.workletLatencyMs.toFixed(2)} ms</dd>
 									</div>
 									<div>
-										<dt>Target</dt>
+										<dt>{copy().targetLabel}</dt>
 										<dd>{snapshot().voiceCleanup.normalisationTargetLufs} LUFS</dd>
 									</div>
 									<div>
-										<dt>Ceiling</dt>
+										<dt>{copy().ceiling}</dt>
 										<dd>{snapshot().voiceCleanup.limiterCeilingDbtp} dBTP</dd>
 									</div>
 								</dl>
@@ -340,29 +367,29 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Export</h2>
+								<h2>{copy().export}</h2>
 								<Show
 									when={snapshot().activeExportSettings}
-									fallback={<p>Start an export to see settings here.</p>}
+									fallback={<p>{copy().startExportToSeeSettings}</p>}
 								>
 									{(settings) => (
 										<dl class="diagnostics-grid">
 											<div>
-												<dt>Codec</dt>
+												<dt>{copy().fieldCodec}</dt>
 												<dd>{settings().codec.toUpperCase()}</dd>
 											</div>
 											<div>
-												<dt>Container</dt>
+												<dt>{copy().fieldContainer}</dt>
 												<dd>{settings().container.toUpperCase()}</dd>
 											</div>
 											<div>
-												<dt>Size</dt>
+												<dt>{copy().fieldSize}</dt>
 												<dd>
 													{settings().width}x{settings().height}
 												</dd>
 											</div>
 											<div>
-												<dt>Source</dt>
+												<dt>{copy().fieldSource}</dt>
 												<dd>{settings().sourceMode}</dd>
 											</div>
 										</dl>
@@ -371,14 +398,14 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Performance Budgets</h2>
+								<h2>{copy().performanceBudgets}</h2>
 								<ul class="diagnostics-list">
 									<For each={snapshot().performanceBudgets}>
 										{(budget) => (
 											<li class={`diagnostics-row ${budgetClass(budget)}`}>
 												<span>{budget.label}</span>
 												<strong>{budget.status}</strong>
-												<p>{observedBudgetValue(budget)}</p>
+												<p>{observedBudgetValue(budget, copy())}</p>
 												<Show when={budget.notes}>
 													<p>{budget.notes}</p>
 												</Show>
@@ -392,16 +419,16 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 										class="export-why-link"
 										onClick={() => props.onOpenGuide?.()}
 									>
-										Performance tips in the user guide
+										{copy().performanceTipsInGuide}
 									</button>
 								</Show>
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Recent Errors</h2>
+								<h2>{copy().recentErrors}</h2>
 								<Show
 									when={snapshot().recentErrors.entries.length > 0}
-									fallback={<p>All clear — no errors to report.</p>}
+									fallback={<p>{copy().allClearNoErrors}</p>}
 								>
 									<ul class="diagnostics-list">
 										<For each={snapshot().recentErrors.entries}>
@@ -421,55 +448,55 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							<Show when={snapshot().interpolation}>
 								{(interp) => (
 									<section class="diagnostics-section">
-										<h2>Frame Interpolation (ML)</h2>
+										<h2>{copy().frameInterpolationMl}</h2>
 										<dl class="diagnostics-grid">
 											<div>
-												<dt>Available</dt>
-												<dd>{interp().available ? 'Yes' : 'No'}</dd>
+												<dt>{copy().interpAvailable}</dt>
+												<dd>{interp().available ? copy().yes : copy().no}</dd>
 											</div>
 											<Show when={interp().accelerator}>
 												<div>
-													<dt>Accelerator</dt>
+													<dt>{copy().interpAccelerator}</dt>
 													<dd>{interp().accelerator}</dd>
 												</div>
 											</Show>
 											<div>
-												<dt>Model</dt>
+												<dt>{copy().interpModel}</dt>
 												<dd>{interp().modelStatus}</dd>
 											</div>
 											<Show when={interp().modelSizeBytes !== null}>
 												<div>
-													<dt>Model size</dt>
+													<dt>{copy().interpModelSize}</dt>
 													<dd>{formatBytes(interp().modelSizeBytes!)}</dd>
 												</div>
 											</Show>
 											<Show when={interp().cacheSource !== null}>
 												<div>
-													<dt>Cache source</dt>
+													<dt>{copy().interpCacheSource}</dt>
 													<dd>{interp().cacheSource}</dd>
 												</div>
 											</Show>
 											<Show when={interp().lastEstimateMs !== null}>
 												<div>
-													<dt>Last estimate</dt>
+													<dt>{copy().interpLastEstimate}</dt>
 													<dd>{formatMs(interp().lastEstimateMs!)}</dd>
 												</div>
 											</Show>
 											<Show when={interp().lastActualMs !== null}>
 												<div>
-													<dt>Last actual</dt>
+													<dt>{copy().interpLastActual}</dt>
 													<dd>{formatMs(interp().lastActualMs!)}</dd>
 												</div>
 											</Show>
 											<Show when={interp().lastRefusals > 0}>
 												<div>
-													<dt>Shot-boundary refusals</dt>
+													<dt>{copy().interpShotBoundaryRefusals}</dt>
 													<dd class="is-warn">{interp().lastRefusals}</dd>
 												</div>
 											</Show>
 										</dl>
 										<Show when={interp().recentErrors.length > 0}>
-											<h3>Recent errors</h3>
+											<h3>{copy().interpRecentErrors}</h3>
 											<ul class="diagnostics-list">
 												<For each={interp().recentErrors}>
 													{(error) => (
@@ -485,10 +512,10 @@ export function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 							</Show>
 
 							<section class="diagnostics-section">
-								<h2>Recovery Actions</h2>
+								<h2>{copy().recoveryActions}</h2>
 								<Show
 									when={snapshot().recoveryActions.length > 0}
-									fallback={<p>No recovery actions are available for this report.</p>}
+									fallback={<p>{copy().noRecoveryActions}</p>}
 								>
 									<ul class="diagnostics-list">
 										<For each={snapshot().recoveryActions}>

@@ -223,36 +223,6 @@ interface TransformSliderSpec {
 	format: (value: number) => string;
 }
 
-const TRANSFORM_SLIDERS: TransformSliderSpec[] = [
-	{ key: 'x', label: 'Position X', min: -1, max: 1, step: 0.005, format: (v) => v.toFixed(3) },
-	{ key: 'y', label: 'Position Y', min: -1, max: 1, step: 0.005, format: (v) => v.toFixed(3) },
-	{ key: 'scale', label: 'Scale', min: 0.1, max: 3, step: 0.01, format: (v) => `${v.toFixed(2)}×` },
-	{
-		key: 'rotation',
-		label: 'Rotation',
-		min: -180,
-		max: 180,
-		step: 1,
-		format: (v) => `${Math.round(v)}°`
-	},
-	{ key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01, format: (v) => v.toFixed(2) }
-];
-
-const FIT_OPTIONS: { value: FitModeSnapshot; label: string }[] = [
-	{ value: 'fill', label: 'Fill' },
-	{ value: 'fit', label: 'Fit' },
-	{ value: 'letterbox', label: 'Letterbox' }
-];
-
-const TIME_REMAP_EASING_OPTIONS: {
-	value: TimeRemapKeyframeSnapshot['easing'];
-	label: string;
-}[] = [
-	{ value: 'linear', label: 'Linear' },
-	{ value: 'ease', label: 'Ease' },
-	{ value: 'hold', label: 'Hold' }
-];
-
 function coerceTimeRemapEasing(value: string): TimeRemapKeyframeSnapshot['easing'] {
 	return value === 'ease' || value === 'hold' ? value : 'linear';
 }
@@ -275,70 +245,6 @@ interface TitleSliderSpec {
 	format: (value: number) => string;
 }
 
-const TITLE_SLIDERS: TitleSliderSpec[] = [
-	{
-		key: 'fontSizePx',
-		label: 'Font size',
-		min: 8,
-		max: 256,
-		step: 1,
-		format: (v) => `${Math.round(v)} px`
-	},
-	{
-		key: 'backgroundOpacity',
-		label: 'Background',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'outlineWidthPx',
-		label: 'Outline',
-		min: 0,
-		max: 32,
-		step: 0.5,
-		format: (v) => `${v.toFixed(1)} px`
-	},
-	{
-		key: 'shadowBlurPx',
-		label: 'Shadow blur',
-		min: 0,
-		max: 64,
-		step: 1,
-		format: (v) => `${Math.round(v)} px`
-	},
-	{
-		key: 'shadowOffsetXPx',
-		label: 'Shadow X',
-		min: -64,
-		max: 64,
-		step: 1,
-		format: (v) => `${Math.round(v)} px`
-	},
-	{
-		key: 'shadowOffsetYPx',
-		label: 'Shadow Y',
-		min: -64,
-		max: 64,
-		step: 1,
-		format: (v) => `${Math.round(v)} px`
-	}
-];
-
-const TITLE_COLORS: { key: TitleColorKey; label: string }[] = [
-	{ key: 'color', label: 'Text' },
-	{ key: 'backgroundColor', label: 'Background' },
-	{ key: 'outlineColor', label: 'Outline' },
-	{ key: 'shadowColor', label: 'Shadow' }
-];
-
-const TITLE_ALIGN_OPTIONS: { value: TitleAlignSnapshot; label: string }[] = [
-	{ value: 'left', label: 'Left' },
-	{ value: 'center', label: 'Center' },
-	{ value: 'right', label: 'Right' }
-];
-
 const PARAM_DEBOUNCE_MS = 80;
 
 interface SliderSpec {
@@ -350,143 +256,6 @@ interface SliderSpec {
 	format: (value: number) => string;
 }
 
-const SLIDERS: SliderSpec[] = [
-	{
-		key: 'brightness',
-		label: 'Brightness',
-		min: -1,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{ key: 'contrast', label: 'Contrast', min: 0, max: 2, step: 0.01, format: (v) => v.toFixed(2) },
-	{
-		key: 'saturation',
-		label: 'Saturation',
-		min: 0,
-		max: 2,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'temperature',
-		label: 'Temperature',
-		min: 2000,
-		max: 10000,
-		step: 50,
-		format: (v) => `${Math.round(v)} K`
-	},
-	{
-		key: 'temperatureStrength',
-		label: 'Temp Strength',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	}
-];
-
-const SKIN_SMOOTH_STRENGTH_SLIDER: SliderSpec = {
-	key: 'skinSmoothStrength',
-	label: 'Strength',
-	min: 0,
-	max: 1,
-	step: 0.01,
-	format: (v) => v.toFixed(2)
-};
-
-const LUT_STRENGTH_SLIDER: SliderSpec = {
-	key: 'lutStrength',
-	label: 'Strength',
-	min: 0,
-	max: 1,
-	step: 0.01,
-	format: (v) => v.toFixed(2)
-};
-
-const LOOK_SLIDERS: SliderSpec[] = [
-	{
-		key: 'grainStrength',
-		label: 'Grain Strength',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'grainSize',
-		label: 'Grain Size',
-		min: 0.5,
-		max: 4.0,
-		step: 0.1,
-		format: (v) => v.toFixed(1)
-	},
-	{
-		key: 'halationThreshold',
-		label: 'Halation Threshold',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'halationRadius',
-		label: 'Halation Radius',
-		min: 0,
-		max: 64,
-		step: 1,
-		format: (v) => `${Math.round(v)}px`
-	},
-	{
-		key: 'halationTintR',
-		label: 'Tint R',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'halationTintG',
-		label: 'Tint G',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'halationTintB',
-		label: 'Tint B',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'vignetteAmount',
-		label: 'Vignette Amount',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'vignetteFeather',
-		label: 'Vignette Feather',
-		min: 0,
-		max: 1,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	},
-	{
-		key: 'vignetteRoundness',
-		label: 'Vignette Roundness',
-		min: 0,
-		max: 2,
-		step: 0.01,
-		format: (v) => v.toFixed(2)
-	}
-];
-
 interface SkinMaskSliderSpec {
 	key: keyof SkinMaskSnapshot;
 	label: string;
@@ -496,21 +265,6 @@ interface SkinMaskSliderSpec {
 	format: (v: number) => string;
 }
 
-const SKIN_MASK_SLIDERS: SkinMaskSliderSpec[] = [
-	{ key: 'cbMin', label: 'Cb min', min: -0.5, max: 0.5, step: 0.01, format: (v) => v.toFixed(2) },
-	{ key: 'cbMax', label: 'Cb max', min: -0.5, max: 0.5, step: 0.01, format: (v) => v.toFixed(2) },
-	{ key: 'crMin', label: 'Cr min', min: -0.5, max: 0.5, step: 0.01, format: (v) => v.toFixed(2) },
-	{ key: 'crMax', label: 'Cr max', min: -0.5, max: 0.5, step: 0.01, format: (v) => v.toFixed(2) },
-	{
-		key: 'softness',
-		label: 'Softness',
-		min: 0.005,
-		max: 0.15,
-		step: 0.005,
-		format: (v) => v.toFixed(3)
-	}
-];
-
 const SKIN_SMOOTH_NATURAL_MAX = 0.45;
 
 type MixDraft = Pick<SelectedTrackMix, 'gain' | 'pan'>;
@@ -519,6 +273,312 @@ type TransformDraft = TransformParamsSnapshot;
 
 export function Inspector(props: InspectorProps) {
 	const copy = () => studioCopy(studioLocale());
+	// Slider / option specs are built inside the component so every label follows
+	// the active locale (these were module-level English constants originally).
+	const TRANSFORM_SLIDERS: TransformSliderSpec[] = [
+		{
+			key: 'x',
+			label: copy().positionX,
+			min: -1,
+			max: 1,
+			step: 0.005,
+			format: (v) => v.toFixed(3)
+		},
+		{
+			key: 'y',
+			label: copy().positionY,
+			min: -1,
+			max: 1,
+			step: 0.005,
+			format: (v) => v.toFixed(3)
+		},
+		{
+			key: 'scale',
+			label: copy().scale,
+			min: 0.1,
+			max: 3,
+			step: 0.01,
+			format: (v) => `${v.toFixed(2)}×`
+		},
+		{
+			key: 'rotation',
+			label: copy().rotation,
+			min: -180,
+			max: 180,
+			step: 1,
+			format: (v) => `${Math.round(v)}°`
+		},
+		{
+			key: 'opacity',
+			label: copy().opacity,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		}
+	];
+	const FIT_OPTIONS: { value: FitModeSnapshot; label: string }[] = [
+		{ value: 'fill', label: copy().fill },
+		{ value: 'fit', label: copy().fit },
+		{ value: 'letterbox', label: copy().letterbox }
+	];
+	const TIME_REMAP_EASING_OPTIONS: {
+		value: TimeRemapKeyframeSnapshot['easing'];
+		label: string;
+	}[] = [
+		{ value: 'linear', label: copy().easingLinear },
+		{ value: 'ease', label: copy().easingEase },
+		{ value: 'hold', label: copy().easingHold }
+	];
+	const TITLE_SLIDERS: TitleSliderSpec[] = [
+		{
+			key: 'fontSizePx',
+			label: copy().fontSize,
+			min: 8,
+			max: 256,
+			step: 1,
+			format: (v) => `${Math.round(v)} px`
+		},
+		{
+			key: 'backgroundOpacity',
+			label: copy().background,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'outlineWidthPx',
+			label: copy().outline,
+			min: 0,
+			max: 32,
+			step: 0.5,
+			format: (v) => `${v.toFixed(1)} px`
+		},
+		{
+			key: 'shadowBlurPx',
+			label: copy().shadowBlur,
+			min: 0,
+			max: 64,
+			step: 1,
+			format: (v) => `${Math.round(v)} px`
+		},
+		{
+			key: 'shadowOffsetXPx',
+			label: copy().shadowX,
+			min: -64,
+			max: 64,
+			step: 1,
+			format: (v) => `${Math.round(v)} px`
+		},
+		{
+			key: 'shadowOffsetYPx',
+			label: copy().shadowY,
+			min: -64,
+			max: 64,
+			step: 1,
+			format: (v) => `${Math.round(v)} px`
+		}
+	];
+	const TITLE_COLORS: { key: TitleColorKey; label: string }[] = [
+		{ key: 'color', label: copy().text },
+		{ key: 'backgroundColor', label: copy().background },
+		{ key: 'outlineColor', label: copy().outline },
+		{ key: 'shadowColor', label: copy().shadow }
+	];
+	const TITLE_ALIGN_OPTIONS: { value: TitleAlignSnapshot; label: string }[] = [
+		{ value: 'left', label: copy().alignLeft },
+		{ value: 'center', label: copy().alignCenter },
+		{ value: 'right', label: copy().alignRight }
+	];
+	const SLIDERS: SliderSpec[] = [
+		{
+			key: 'brightness',
+			label: copy().brightness,
+			min: -1,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'contrast',
+			label: copy().contrast,
+			min: 0,
+			max: 2,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'saturation',
+			label: copy().saturation,
+			min: 0,
+			max: 2,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'temperature',
+			label: copy().temperature,
+			min: 2000,
+			max: 10000,
+			step: 50,
+			format: (v) => `${Math.round(v)} K`
+		},
+		{
+			key: 'temperatureStrength',
+			label: copy().tempStrength,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		}
+	];
+	const SKIN_SMOOTH_STRENGTH_SLIDER: SliderSpec = {
+		key: 'skinSmoothStrength',
+		label: copy().strength,
+		min: 0,
+		max: 1,
+		step: 0.01,
+		format: (v) => v.toFixed(2)
+	};
+	const LUT_STRENGTH_SLIDER: SliderSpec = {
+		key: 'lutStrength',
+		label: copy().strength,
+		min: 0,
+		max: 1,
+		step: 0.01,
+		format: (v) => v.toFixed(2)
+	};
+	const LOOK_SLIDERS: SliderSpec[] = [
+		{
+			key: 'grainStrength',
+			label: copy().grainStrength,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'grainSize',
+			label: copy().grainSize,
+			min: 0.5,
+			max: 4.0,
+			step: 0.1,
+			format: (v) => v.toFixed(1)
+		},
+		{
+			key: 'halationThreshold',
+			label: copy().halationThreshold,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'halationRadius',
+			label: copy().halationRadius,
+			min: 0,
+			max: 64,
+			step: 1,
+			format: (v) => `${Math.round(v)}px`
+		},
+		{
+			key: 'halationTintR',
+			label: copy().tintR,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'halationTintG',
+			label: copy().tintG,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'halationTintB',
+			label: copy().tintB,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'vignetteAmount',
+			label: copy().vignetteAmount,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'vignetteFeather',
+			label: copy().vignetteFeather,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'vignetteRoundness',
+			label: copy().vignetteRoundness,
+			min: 0,
+			max: 2,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		}
+	];
+	const SKIN_MASK_SLIDERS: SkinMaskSliderSpec[] = [
+		{
+			key: 'cbMin',
+			label: copy().cbMin,
+			min: -0.5,
+			max: 0.5,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'cbMax',
+			label: copy().cbMax,
+			min: -0.5,
+			max: 0.5,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'crMin',
+			label: copy().crMin,
+			min: -0.5,
+			max: 0.5,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'crMax',
+			label: copy().crMax,
+			min: -0.5,
+			max: 0.5,
+			step: 0.01,
+			format: (v) => v.toFixed(2)
+		},
+		{
+			key: 'softness',
+			label: copy().softness,
+			min: 0.005,
+			max: 0.15,
+			step: 0.005,
+			format: (v) => v.toFixed(3)
+		}
+	];
+	// Localized keyframe navigation aria templates.
+	const keyframeAria = {
+		previous: (label: string) => copy().prevKeyframe.replace('{label}', label),
+		toggle: (label: string) => copy().toggleKeyframe.replace('{label}', label),
+		next: (label: string) => copy().nextKeyframe.replace('{label}', label)
+	};
 	const [draft, setDraft] = createSignal<ClipEffectParamsSnapshot | null>(null);
 	const [mixDraft, setMixDraft] = createSignal<MixDraft | null>(null);
 	const [fadeDraft, setFadeDraft] = createSignal<FadeDraft | null>(null);
@@ -567,21 +627,20 @@ export function Inspector(props: InspectorProps) {
 	);
 	const skinSmoothIsStrong = createMemo(() => skinSmoothStrength() > SKIN_SMOOTH_NATURAL_MAX);
 	const skinSmoothStatus = createMemo(() => {
-		if (skinSmoothIsStrong()) return 'Strong smoothing';
-		if (skinSmoothStrength() > 0) return 'Preview active';
-		if (skinSmoothKeyframed()) return 'Keyframed';
-		return 'Inactive at 0.00 strength';
+		if (skinSmoothIsStrong()) return copy().skinSmoothStatusStrong;
+		if (skinSmoothStrength() > 0) return copy().skinSmoothStatusPreview;
+		if (skinSmoothKeyframed()) return copy().skinSmoothStatusKeyframed;
+		return copy().skinSmoothStatusInactive;
 	});
 	const skinSmoothNote = createMemo(() => {
-		if (!skinMaskControlsEnabled())
-			return 'Raise Skin Smoothing above 0.00 before tuning the mask.';
+		if (!skinMaskControlsEnabled()) return copy().skinSmoothNoteRaise;
 		if (skinSmoothIsStrong()) {
-			return 'High strength can make faces look synthetic; start under 0.45 and A/B the result.';
+			return copy().skinSmoothNoteHigh;
 		}
 		if (skinSmoothKeyframed() && skinSmoothStrength() === 0) {
-			return 'Keyframed strength uses this mask wherever smoothing is active.';
+			return copy().skinSmoothNoteKeyframed;
 		}
-		return 'Natural range; mask edits update this clip.';
+		return copy().skinSmoothNoteNatural;
 	});
 
 	const lookNeutral = createMemo(() => {
@@ -743,13 +802,13 @@ export function Inspector(props: InspectorProps) {
 	const beautyModelStateLabel = (): string => {
 		switch (props.beautyModelStatus) {
 			case 'loading':
-				return 'Loading…';
+				return copy().loading;
 			case 'failed':
-				return 'Unavailable';
+				return copy().unavailable;
 			case 'loaded':
-				return 'Ready';
+				return copy().ready;
 			default:
-				return 'Load required';
+				return copy().loadRequired;
 		}
 	};
 	const beautyModelSizeLabel = (): string => {
@@ -1235,21 +1294,17 @@ export function Inspector(props: InspectorProps) {
 			<h2 class="panel-title">{copy().inspector}</h2>
 			<Show
 				when={props.selectedClip}
-				fallback={
-					<RailEmpty title={copy().selectClip}>
-						{copy().selectClipHint}
-					</RailEmpty>
-				}
+				fallback={<RailEmpty title={copy().selectClip}>{copy().selectClipHint}</RailEmpty>}
 			>
 				{(clip) => (
 					<div class="inspector-section">
 						<dl class="clip-summary">
 							<div>
-								<dt>Track</dt>
+								<dt>{copy().track}</dt>
 								<dd>{clip().trackId}</dd>
 							</div>
 							<div>
-								<dt>Clip</dt>
+								<dt>{copy().clip}</dt>
 								<dd>{clip().clipId}</dd>
 							</div>
 						</dl>
@@ -1261,24 +1316,24 @@ export function Inspector(props: InspectorProps) {
 									disabled={(props.recorderSessionState ?? 'idle') !== 'idle'}
 									title={
 										(props.recorderSessionState ?? 'idle') !== 'idle'
-											? 'Recording in progress'
+											? copy().recordingInProgress
 											: undefined
 									}
 								>
 									<RotateCcw size={14} aria-hidden="true" />
-									Retake
+									{copy().retake}
 								</button>
 								<Show when={(props.recorderSessionState ?? 'idle') !== 'idle'}>
-									<span>Recording in progress</span>
+									<span>{copy().recordingInProgress}</span>
 								</Show>
 							</div>
 						</Show>
 						<Show when={titleDraft()}>
 							{(title) => (
 								<div class="title-controls">
-									<h3 class="panel-subtitle">Title</h3>
+									<h3 class="panel-subtitle">{copy().title}</h3>
 									<label class="title-text-label">
-										<span class="effect-slider-label">Text</span>
+										<span class="effect-slider-label">{copy().text}</span>
 										<textarea
 											class="title-text-input"
 											rows={2}
@@ -1335,7 +1390,7 @@ export function Inspector(props: InspectorProps) {
 										</For>
 									</div>
 									<label class="effect-slider transform-fit">
-										<span class="effect-slider-label">Align</span>
+										<span class="effect-slider-label">{copy().align}</span>
 										<select
 											value={title().style.align}
 											onChange={(e) =>
@@ -1358,10 +1413,10 @@ export function Inspector(props: InspectorProps) {
 						<Show when={mixDraft()}>
 							{(mix) => (
 								<div class="track-mix-controls">
-									<h3 class="panel-subtitle">Track mix</h3>
+									<h3 class="panel-subtitle">{copy().trackMix}</h3>
 									<label class="effect-slider">
 										<span class="effect-slider-label">
-											Gain
+											{copy().gain}
 											<span class="effect-slider-value tabular-nums">{mix().gain.toFixed(2)}</span>
 										</span>
 										<input
@@ -1380,7 +1435,7 @@ export function Inspector(props: InspectorProps) {
 									</label>
 									<label class="effect-slider">
 										<span class="effect-slider-label">
-											Pan
+											{copy().pan}
 											<span class="effect-slider-value tabular-nums">{mix().pan.toFixed(2)}</span>
 										</span>
 										<input
@@ -1408,7 +1463,7 @@ export function Inspector(props: InspectorProps) {
 															)
 														}
 													/>
-													Mute
+													{copy().mute}
 												</label>
 												<label class="mix-toggle">
 													<input
@@ -1421,7 +1476,7 @@ export function Inspector(props: InspectorProps) {
 															)
 														}
 													/>
-													Solo
+													{copy().solo}
 												</label>
 											</>
 										)}
@@ -1432,10 +1487,10 @@ export function Inspector(props: InspectorProps) {
 						<Show when={fadeDraft()}>
 							{(fades) => (
 								<div class="track-mix-controls">
-									<h3 class="panel-subtitle">Audio fades</h3>
+									<h3 class="panel-subtitle">{copy().audioFades}</h3>
 									<label class="effect-slider">
 										<span class="effect-slider-label">
-											Fade in
+											{copy().fadeIn}
 											<span class="effect-slider-value tabular-nums">
 												{fades().audioFadeIn.toFixed(2)}s
 											</span>
@@ -1456,7 +1511,7 @@ export function Inspector(props: InspectorProps) {
 									</label>
 									<label class="effect-slider">
 										<span class="effect-slider-label">
-											Fade out
+											{copy().fadeOut}
 											<span class="effect-slider-value tabular-nums">
 												{fades().audioFadeOut.toFixed(2)}s
 											</span>
@@ -1481,7 +1536,7 @@ export function Inspector(props: InspectorProps) {
 						<Show when={transformDraft()}>
 							{(transform) => (
 								<div class="effect-sliders transform-controls">
-									<h3 class="panel-subtitle">Transform</h3>
+									<h3 class="panel-subtitle">{copy().transform}</h3>
 									<For each={TRANSFORM_SLIDERS}>
 										{(spec) => (
 											<div class="effect-slider">
@@ -1495,7 +1550,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class="keyframe-nav"
-														aria-label={`Previous ${spec.label} keyframe`}
+														aria-label={keyframeAria.previous(spec.label)}
 														onClick={() => seekKeyframe(spec.key, -1)}
 														disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 													>
@@ -1504,7 +1559,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class={`keyframe-toggle${hasKeyframeAtPlayhead(spec.key) ? ' is-active' : ''}`}
-														aria-label={`Toggle ${spec.label} keyframe`}
+														aria-label={keyframeAria.toggle(spec.label)}
 														aria-pressed={hasKeyframeAtPlayhead(spec.key)}
 														onClick={() => toggleKeyframe(spec.key, transform()[spec.key])}
 														disabled={currentLocalTime() === null}
@@ -1527,7 +1582,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class="keyframe-nav"
-														aria-label={`Next ${spec.label} keyframe`}
+														aria-label={keyframeAria.next(spec.label)}
 														onClick={() => seekKeyframe(spec.key, 1)}
 														disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 													>
@@ -1538,7 +1593,7 @@ export function Inspector(props: InspectorProps) {
 										)}
 									</For>
 									<label class="effect-slider transform-fit">
-										<span class="effect-slider-label">Fit</span>
+										<span class="effect-slider-label">{copy().fit}</span>
 										<select
 											value={transform().fit}
 											onChange={(e) =>
@@ -1559,11 +1614,11 @@ export function Inspector(props: InspectorProps) {
 								fallback={
 									<div
 										class="inspector-section phase43-disabled"
-										title="Requires WebGPU (accelerated tier)"
+										title={copy().requiresWebGPU}
 										aria-disabled="true"
 									>
-										<h3 class="panel-subtitle">Screencast Tools</h3>
-										<p class="placeholder-text">Requires WebGPU (accelerated tier)</p>
+										<h3 class="panel-subtitle">{copy().screencastTools}</h3>
+										<p class="placeholder-text">{copy().requiresWebGPU}</p>
 									</div>
 								}
 							>
@@ -1637,14 +1692,14 @@ export function Inspector(props: InspectorProps) {
 							}
 						>
 							<div class="effect-sliders">
-								<h3 class="panel-subtitle">Speed</h3>
+								<h3 class="panel-subtitle">{copy().speed}</h3>
 								<Show
 									when={props.selectedClip?.timeRemap}
 									fallback={
 										<button
 											type="button"
 											class="btn btn-secondary"
-											aria-label="Add speed ramp"
+											aria-label={copy().addSpeedRamp}
 											onClick={() => {
 												const selected = props.selectedClip;
 												if (!selected) return;
@@ -1658,7 +1713,7 @@ export function Inspector(props: InspectorProps) {
 												});
 											}}
 										>
-											Add Ramp
+											{copy().addRamp}
 										</button>
 									}
 								>
@@ -1669,9 +1724,11 @@ export function Inspector(props: InspectorProps) {
 													<For each={remap().keyframes}>
 														{(kf, i) => (
 															<div class="remap-keyframe">
-																<div class="remap-keyframe-title">Keyframe {i() + 1}</div>
+																<div class="remap-keyframe-title">
+																	{copy().keyframeN.replace('{n}', String(i() + 1))}
+																</div>
 																<label class="remap-control-row">
-																	<span class="remap-control-label">Time</span>
+																	<span class="remap-control-label">{copy().time}</span>
 																	<input
 																		class="remap-number-input"
 																		type="number"
@@ -1679,7 +1736,10 @@ export function Inspector(props: InspectorProps) {
 																		max={props.selectedClip?.duration ?? remap().sourceDurationS}
 																		step="0.01"
 																		value={kf.outTimeS}
-																		aria-label={`Speed ramp keyframe ${i() + 1} time`}
+																		aria-label={copy().speedRampKeyframeTime.replace(
+																			'{n}',
+																			String(i() + 1)
+																		)}
 																		onChange={(e) =>
 																			updateRemapKeyframe(remap(), i(), {
 																				outTimeS: Number(e.currentTarget.value)
@@ -1689,7 +1749,7 @@ export function Inspector(props: InspectorProps) {
 																	<span class="remap-unit">s</span>
 																</label>
 																<label class="remap-control-row">
-																	<span class="remap-control-label">Speed</span>
+																	<span class="remap-control-label">{copy().speed}</span>
 																	<input
 																		class="remap-speed-slider"
 																		type="range"
@@ -1697,7 +1757,10 @@ export function Inspector(props: InspectorProps) {
 																		max="4"
 																		step="0.01"
 																		value={kf.speed}
-																		aria-label={`Speed ramp keyframe ${i() + 1} speed`}
+																		aria-label={copy().speedRampKeyframeSpeed.replace(
+																			'{n}',
+																			String(i() + 1)
+																		)}
 																		onChange={(e) =>
 																			updateRemapKeyframe(remap(), i(), {
 																				speed: Number(e.currentTarget.value)
@@ -1707,11 +1770,14 @@ export function Inspector(props: InspectorProps) {
 																	<span class="remap-speed-value">{kf.speed.toFixed(2)}x</span>
 																</label>
 																<label class="remap-control-row">
-																	<span class="remap-control-label">Easing</span>
+																	<span class="remap-control-label">{copy().easing}</span>
 																	<select
 																		class="remap-select"
 																		value={kf.easing}
-																		aria-label={`Speed ramp keyframe ${i() + 1} easing`}
+																		aria-label={copy().speedRampKeyframeEasing.replace(
+																			'{n}',
+																			String(i() + 1)
+																		)}
 																		onChange={(e) =>
 																			updateRemapKeyframe(remap(), i(), {
 																				easing: coerceTimeRemapEasing(e.currentTarget.value)
@@ -1732,16 +1798,16 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class="btn btn-secondary"
-													aria-label="Add speed ramp keyframe"
+													aria-label={copy().addSpeedRampKeyframe}
 													onClick={() => addRemapKeyframe(remap())}
 												>
-													Add Keyframe
+													{copy().addKeyframe}
 												</button>
 												<label class="remap-pitch-preserve">
 													<input
 														type="checkbox"
 														checked={remap().pitchPreserve}
-														aria-label="Pitch preserve"
+														aria-label={copy().pitchPreserve}
 														onChange={(e) =>
 															sendTimeRemap({
 																...remap(),
@@ -1749,20 +1815,20 @@ export function Inspector(props: InspectorProps) {
 															})
 														}
 													/>
-													<span>Pitch Preserve</span>
+													<span>{copy().pitchPreserve}</span>
 												</label>
 											</div>
 											<button
 												type="button"
 												class="btn btn-secondary"
-												aria-label="Clear speed ramp"
+												aria-label={copy().clearSpeedRamp}
 												onClick={() => {
 													const selected = props.selectedClip;
 													if (!selected) return;
 													props.onClearTimeRemap?.(selected.trackId, selected.clipId);
 												}}
 											>
-												Clear Ramp
+												{copy().clearRamp}
 											</button>
 										</>
 									)}
@@ -1772,7 +1838,7 @@ export function Inspector(props: InspectorProps) {
 						<Show when={draft()}>
 							{(effects) => (
 								<div class="effect-sliders">
-									<h3 class="panel-subtitle">Effects</h3>
+									<h3 class="panel-subtitle">{copy().effects}</h3>
 									<For each={SLIDERS}>
 										{(spec) => (
 											<div class="effect-slider">
@@ -1786,7 +1852,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class="keyframe-nav"
-														aria-label={`Previous ${spec.label} keyframe`}
+														aria-label={keyframeAria.previous(spec.label)}
 														onClick={() => seekKeyframe(spec.key, -1)}
 														disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 													>
@@ -1795,7 +1861,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class={`keyframe-toggle${hasKeyframeAtPlayhead(spec.key) ? ' is-active' : ''}`}
-														aria-label={`Toggle ${spec.label} keyframe`}
+														aria-label={keyframeAria.toggle(spec.label)}
 														aria-pressed={hasKeyframeAtPlayhead(spec.key)}
 														onClick={() => toggleKeyframe(spec.key, effects()[spec.key])}
 														disabled={currentLocalTime() === null}
@@ -1818,7 +1884,7 @@ export function Inspector(props: InspectorProps) {
 													<button
 														type="button"
 														class="keyframe-nav"
-														aria-label={`Next ${spec.label} keyframe`}
+														aria-label={keyframeAria.next(spec.label)}
 														onClick={() => seekKeyframe(spec.key, 1)}
 														disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 													>
@@ -1838,26 +1904,24 @@ export function Inspector(props: InspectorProps) {
 									>
 										<Show when={props.previewTierSupportsSkinSmooth === false}>
 											<p class="skin-smooth-tier-note" role="note">
-												Skin Smoothing requires WebGPU support. The current preview tier can't
-												render the effect, and any strength you set won't appear in preview or
-												export.
+												{copy().skinSmoothRequiresWebGPU}
 											</p>
 										</Show>
 										<div class="skin-smooth-status">
 											<span class="skin-smooth-status-copy">
-												<span class="skin-smooth-title">Skin Smoothing</span>
+												<span class="skin-smooth-title">{copy().skinSmoothing}</span>
 												<span class="skin-smooth-status-text">{skinSmoothStatus()}</span>
 											</span>
 											<span
 												class={`skin-smooth-status-pill${skinMaskControlsEnabled() ? ' is-active' : ' is-inactive'}${skinSmoothIsStrong() ? ' is-warning' : ''}`}
 											>
 												{skinSmoothIsStrong()
-													? 'Strong'
+													? copy().strong
 													: skinSmoothStrength() > 0
-														? 'On'
+														? copy().on
 														: skinSmoothKeyframed()
-															? 'Animated'
-															: 'Off'}
+															? copy().animated
+															: copy().off}
 											</span>
 										</div>
 										<div class="effect-slider skin-smooth-strength">
@@ -1871,7 +1935,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class="keyframe-nav"
-													aria-label="Previous Skin Smoothing keyframe"
+													aria-label={keyframeAria.previous(copy().skinSmoothing)}
 													onClick={() => seekKeyframe(SKIN_SMOOTH_STRENGTH_SLIDER.key, -1)}
 													disabled={!props.selectedClip?.keyframes?.skinSmoothStrength?.length}
 												>
@@ -1880,7 +1944,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class={`keyframe-toggle${hasKeyframeAtPlayhead(SKIN_SMOOTH_STRENGTH_SLIDER.key) ? ' is-active' : ''}`}
-													aria-label="Toggle Skin Smoothing keyframe"
+													aria-label={keyframeAria.toggle(copy().skinSmoothing)}
 													aria-pressed={hasKeyframeAtPlayhead(SKIN_SMOOTH_STRENGTH_SLIDER.key)}
 													onClick={() =>
 														toggleKeyframe(
@@ -1909,7 +1973,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class="keyframe-nav"
-													aria-label="Next Skin Smoothing keyframe"
+													aria-label={keyframeAria.next(copy().skinSmoothing)}
 													onClick={() => seekKeyframe(SKIN_SMOOTH_STRENGTH_SLIDER.key, 1)}
 													disabled={!props.selectedClip?.keyframes?.skinSmoothStrength?.length}
 												>
@@ -1926,7 +1990,7 @@ export function Inspector(props: InspectorProps) {
 													type="button"
 													class={`bypass-toggle${skinSmoothBypass() ? ' is-active' : ''}`}
 													aria-pressed={skinSmoothBypass()}
-													aria-label="Bypass skin smoothing (A/B)"
+													aria-label={copy().bypassSkinSmoothing}
 													onClick={() => {
 														const clip = props.selectedClip;
 														if (clip && props.onSkinSmoothBypass) {
@@ -1936,17 +2000,17 @@ export function Inspector(props: InspectorProps) {
 														}
 													}}
 												>
-													A/B Bypass
+													{copy().bypass}
 												</button>
-												<span>Preview only; export uses stored strength.</span>
+												<span>{copy().previewOnlyNote}</span>
 											</div>
 										</Show>
 										<details
 											class={`skin-mask-disclosure${skinMaskControlsEnabled() ? '' : ' is-disabled'}`}
 										>
 											<summary>
-												<span>Skin mask</span>
-												<span class="skin-mask-summary">Advanced</span>
+												<span>{copy().skinMask}</span>
+												<span class="skin-mask-summary">{copy().advanced}</span>
 											</summary>
 											<div class="skin-mask-sliders">
 												<For each={SKIN_MASK_SLIDERS}>
@@ -1989,7 +2053,7 @@ export function Inspector(props: InspectorProps) {
 														}
 													}}
 												>
-													Reset mask
+													{copy().resetMask}
 												</button>
 											</div>
 										</details>
@@ -1999,13 +2063,13 @@ export function Inspector(props: InspectorProps) {
 											<span class="effect-slider-label">
 												LUT{' '}
 												<span class="text-xs text-muted-foreground font-normal">
-													(Experimental)
+													{copy().experimental}
 												</span>
 											</span>
 											<button
 												type="button"
 												class="lut-import-button"
-												aria-label="Import LUT"
+												aria-label={copy().importLut}
 												onClick={() => lutInput?.click()}
 											>
 												<Upload size={14} />
@@ -2026,7 +2090,7 @@ export function Inspector(props: InspectorProps) {
 										</div>
 										<Show
 											when={props.selectedClip?.lut}
-											fallback={<p class="lut-empty">Import a .cube file to apply a look</p>}
+											fallback={<p class="lut-empty">{copy().importCubeFile}</p>}
 										>
 											{(lut) => (
 												<p class="lut-name">
@@ -2046,7 +2110,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class="keyframe-nav"
-													aria-label="Previous LUT strength keyframe"
+													aria-label={keyframeAria.previous(copy().lutStrength)}
 													onClick={() => seekKeyframe(LUT_STRENGTH_SLIDER.key, -1)}
 													disabled={!props.selectedClip?.keyframes?.lutStrength?.length}
 												>
@@ -2055,7 +2119,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class={`keyframe-toggle${hasKeyframeAtPlayhead(LUT_STRENGTH_SLIDER.key) ? ' is-active' : ''}`}
-													aria-label="Toggle LUT strength keyframe"
+													aria-label={keyframeAria.toggle(copy().lutStrength)}
 													aria-pressed={hasKeyframeAtPlayhead(LUT_STRENGTH_SLIDER.key)}
 													onClick={() =>
 														toggleKeyframe(LUT_STRENGTH_SLIDER.key, effects().lutStrength)
@@ -2081,7 +2145,7 @@ export function Inspector(props: InspectorProps) {
 												<button
 													type="button"
 													class="keyframe-nav"
-													aria-label="Next LUT strength keyframe"
+													aria-label={keyframeAria.next(copy().lutStrength)}
 													onClick={() => seekKeyframe(LUT_STRENGTH_SLIDER.key, 1)}
 													disabled={!props.selectedClip?.keyframes?.lutStrength?.length}
 												>
@@ -2096,12 +2160,12 @@ export function Inspector(props: InspectorProps) {
 									>
 										<div class="look-controls">
 											<div class="look-header">
-												<span class="effect-slider-label">Look</span>
+												<span class="effect-slider-label">{copy().look}</span>
 												<Show when={props.onImportLookPreset}>
 													<button
 														type="button"
 														class="lut-import-button"
-														aria-label="Apply Look Preset"
+														aria-label={copy().applyLookPreset}
 														onClick={() => lookPresetInput?.click()}
 													>
 														<Upload size={14} />
@@ -2156,7 +2220,7 @@ export function Inspector(props: InspectorProps) {
 																<button
 																	type="button"
 																	class="keyframe-nav"
-																	aria-label={`Previous ${spec.label} keyframe`}
+																	aria-label={keyframeAria.previous(spec.label)}
 																	onClick={() => seekKeyframe(spec.key, -1)}
 																	disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 																>
@@ -2165,7 +2229,7 @@ export function Inspector(props: InspectorProps) {
 																<button
 																	type="button"
 																	class={`keyframe-toggle${hasKeyframeAtPlayhead(spec.key) ? ' is-active' : ''}`}
-																	aria-label={`Toggle ${spec.label} keyframe`}
+																	aria-label={keyframeAria.toggle(spec.label)}
 																	aria-pressed={hasKeyframeAtPlayhead(spec.key)}
 																	onClick={() => toggleKeyframe(spec.key, effects()[spec.key])}
 																	disabled={currentLocalTime() === null}
@@ -2188,7 +2252,7 @@ export function Inspector(props: InspectorProps) {
 																<button
 																	type="button"
 																	class="keyframe-nav"
-																	aria-label={`Next ${spec.label} keyframe`}
+																	aria-label={keyframeAria.next(spec.label)}
 																	onClick={() => seekKeyframe(spec.key, 1)}
 																	disabled={!props.selectedClip?.keyframes?.[spec.key]?.length}
 																>
@@ -2209,7 +2273,7 @@ export function Inspector(props: InspectorProps) {
 															)
 														}
 													>
-														Export Look Preset…
+														{copy().exportLookPreset}
 													</button>
 												</Show>
 											</Show>
@@ -2220,16 +2284,16 @@ export function Inspector(props: InspectorProps) {
 										<div class="matte-controls">
 											<div class="matte-header">
 												<span class="effect-slider-label">
-													Portrait Matte{' '}
+													{copy().portraitMatte}{' '}
 													<span class="text-xs text-muted-foreground font-normal">
-														(Experimental)
+														{copy().experimental}
 													</span>
 												</span>
 												<Show when={props.matteStatus?.modelStatus === 'loading'}>
-													<span class="text-xs text-muted-foreground">Loading...</span>
+													<span class="text-xs text-muted-foreground">{copy().loading}</span>
 												</Show>
 												<Show when={props.matteStatus?.modelStatus === 'failed'}>
-													<span class="text-xs text-destructive">Failed</span>
+													<span class="text-xs text-destructive">{copy().failed}</span>
 												</Show>
 											</div>
 											<div class="matte-toggle-row">
@@ -2239,13 +2303,13 @@ export function Inspector(props: InspectorProps) {
 														checked={props.selectedClip?.matte?.enabled ?? false}
 														onChange={(e) => props.onSetMatteEnabled?.(e.currentTarget.checked)}
 													/>
-													<span>Enable</span>
+													<span>{copy().enable}</span>
 												</label>
 											</div>
 											<Show when={props.selectedClip?.matte?.enabled}>
 												<div class="matte-toggle-row">
 													<label class="matte-toggle-label" for="matte-mode-select">
-														Mode
+														{copy().mode}
 													</label>
 													<select
 														id="matte-mode-select"
@@ -2256,20 +2320,17 @@ export function Inspector(props: InspectorProps) {
 															)
 														}
 													>
-														<option value="remove">Remove background</option>
-														<option value="replace">Replace background</option>
-														<option value="blur">Blur background</option>
+														<option value="remove">{copy().matteRemove}</option>
+														<option value="replace">{copy().matteReplace}</option>
+														<option value="blur">{copy().matteBlur}</option>
 													</select>
 												</div>
 												<Show when={props.selectedClip?.matte?.mode === 'replace'}>
-													<p class="text-xs text-muted-foreground">
-														Place the background source on the track directly below this clip — the
-														removed background reveals it.
-													</p>
+													<p class="text-xs text-muted-foreground">{copy().matteReplaceNote}</p>
 												</Show>
 												<div class="effect-slider">
 													<div class="effect-slider-label">
-														<span>Strength</span>
+														<span>{copy().strength}</span>
 														<span class="effect-slider-value tabular-nums">
 															{Math.round((props.selectedClip?.matte?.strength ?? 1) * 100)}%
 														</span>
@@ -2290,7 +2351,7 @@ export function Inspector(props: InspectorProps) {
 												<Show when={props.selectedClip?.matte?.mode === 'blur'}>
 													<div class="effect-slider">
 														<div class="effect-slider-label">
-															<span>Blur radius</span>
+															<span>{copy().blurRadius}</span>
 															<span class="effect-slider-value tabular-nums">
 																{Math.round(props.selectedClip?.matte?.blurRadius ?? 16)}px
 															</span>
@@ -2323,13 +2384,10 @@ export function Inspector(props: InspectorProps) {
 							<Show when={props.beautyAvailable === false}>
 								<div class="beauty-panel">
 									<div class="beauty-status">
-										<span class="beauty-title">Beauty</span>
-										<span class="beauty-status-pill">Unavailable</span>
+										<span class="beauty-title">{copy().beauty}</span>
+										<span class="beauty-status-pill">{copy().unavailable}</span>
 									</div>
-									<p class="beauty-hint">
-										Beauty needs WebGPU and cross-origin isolation; it's unavailable on this
-										browser.
-									</p>
+									<p class="beauty-hint">{copy().beautyNeedsWebGPU}</p>
 								</div>
 							</Show>
 							<Show
@@ -2340,12 +2398,12 @@ export function Inspector(props: InspectorProps) {
 							>
 								<div class="beauty-panel">
 									<div class="beauty-status">
-										<span class="beauty-title">Beauty</span>
+										<span class="beauty-title">{copy().beauty}</span>
 										<span class="beauty-status-pill">{beautyModelStateLabel()}</span>
 									</div>
 									<p class="beauty-hint">
-										On-device face-landmark model{beautyModelSizeLabel()}. Runs locally — nothing is
-										uploaded.
+										{copy().onDeviceModel}
+										{beautyModelSizeLabel()}. {copy().runsLocally}
 									</p>
 									<Show when={props.beautyModelStatus !== 'loading'}>
 										<button
@@ -2353,7 +2411,8 @@ export function Inspector(props: InspectorProps) {
 											class="button secondary"
 											onClick={() => props.onLoadBeautyModel?.()}
 										>
-											Load beauty model{beautyModelSizeLabel()}
+											{copy().loadBeautyModel}
+											{beautyModelSizeLabel()}
 										</button>
 									</Show>
 									<Show when={props.beautyModelError} keyed>
@@ -2375,12 +2434,14 @@ export function Inspector(props: InspectorProps) {
 							{(beauty) => (
 								<div class="beauty-panel">
 									<div class="beauty-status">
-										<span class="beauty-title">Beauty</span>
-										<span class="beauty-status-pill">{beauty().enabled ? 'On' : 'Off'}</span>
+										<span class="beauty-title">{copy().beauty}</span>
+										<span class="beauty-status-pill">
+											{beauty().enabled ? copy().on : copy().off}
+										</span>
 										<button
 											type="button"
 											class="button secondary"
-											aria-label={beauty().enabled ? 'Disable Beauty' : 'Enable Beauty'}
+											aria-label={beauty().enabled ? copy().disableBeauty : copy().enableBeauty}
 											onClick={() => {
 												const clip = props.selectedClip;
 												if (clip && props.onBeautyEffect) {
@@ -2390,12 +2451,12 @@ export function Inspector(props: InspectorProps) {
 												}
 											}}
 										>
-											{beauty().enabled ? 'Disable' : 'Enable'}
+											{beauty().enabled ? copy().disable : copy().enable}
 										</button>
 									</div>
 									<div class="effect-slider">
 										<div class="effect-slider-label">
-											<span>Master Strength</span>
+											<span>{copy().masterStrength}</span>
 											<span class="effect-slider-value tabular-nums">
 												{beauty().masterStrength.toFixed(2)}
 											</span>
@@ -2404,7 +2465,9 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Previous Beauty master strength keyframe"
+												aria-label={keyframeAria.previous(
+													`${copy().beauty} ${copy().masterStrength}`
+												)}
 												onClick={() => seekKeyframe('beauty.masterStrength', -1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.masterStrength']?.length}
 											>
@@ -2413,7 +2476,9 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class={`keyframe-toggle${hasKeyframeAtPlayhead('beauty.masterStrength') ? ' is-active' : ''}`}
-												aria-label="Toggle Beauty master strength keyframe"
+												aria-label={keyframeAria.toggle(
+													`${copy().beauty} ${copy().masterStrength}`
+												)}
 												aria-pressed={hasKeyframeAtPlayhead('beauty.masterStrength')}
 												onClick={() =>
 													toggleKeyframe('beauty.masterStrength', beauty().masterStrength)
@@ -2440,7 +2505,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Next Beauty master strength keyframe"
+												aria-label={keyframeAria.next(`${copy().beauty} ${copy().masterStrength}`)}
 												onClick={() => seekKeyframe('beauty.masterStrength', 1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.masterStrength']?.length}
 											>
@@ -2450,7 +2515,7 @@ export function Inspector(props: InspectorProps) {
 									</div>
 									<div class="effect-slider">
 										<div class="effect-slider-label">
-											<span>Jaw Slim</span>
+											<span>{copy().jawSlim}</span>
 											<span class="effect-slider-value tabular-nums">
 												{beauty().jawSlim.toFixed(2)}
 											</span>
@@ -2459,7 +2524,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Previous Jaw Slim keyframe"
+												aria-label={keyframeAria.previous(copy().jawSlim)}
 												onClick={() => seekKeyframe('beauty.jawSlim', -1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.jawSlim']?.length}
 											>
@@ -2468,7 +2533,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class={`keyframe-toggle${hasKeyframeAtPlayhead('beauty.jawSlim') ? ' is-active' : ''}`}
-												aria-label="Toggle Jaw Slim keyframe"
+												aria-label={keyframeAria.toggle(copy().jawSlim)}
 												aria-pressed={hasKeyframeAtPlayhead('beauty.jawSlim')}
 												onClick={() => toggleKeyframe('beauty.jawSlim', beauty().jawSlim)}
 												disabled={currentLocalTime() === null}
@@ -2493,7 +2558,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Next Jaw Slim keyframe"
+												aria-label={keyframeAria.next(copy().jawSlim)}
 												onClick={() => seekKeyframe('beauty.jawSlim', 1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.jawSlim']?.length}
 											>
@@ -2503,7 +2568,7 @@ export function Inspector(props: InspectorProps) {
 									</div>
 									<div class="effect-slider">
 										<div class="effect-slider-label">
-											<span>Eye Enlarge</span>
+											<span>{copy().eyeEnlarge}</span>
 											<span class="effect-slider-value tabular-nums">
 												{beauty().eyeEnlarge.toFixed(2)}
 											</span>
@@ -2512,7 +2577,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Previous Eye Enlarge keyframe"
+												aria-label={keyframeAria.previous(copy().eyeEnlarge)}
 												onClick={() => seekKeyframe('beauty.eyeEnlarge', -1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.eyeEnlarge']?.length}
 											>
@@ -2521,7 +2586,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class={`keyframe-toggle${hasKeyframeAtPlayhead('beauty.eyeEnlarge') ? ' is-active' : ''}`}
-												aria-label="Toggle Eye Enlarge keyframe"
+												aria-label={keyframeAria.toggle(copy().eyeEnlarge)}
 												aria-pressed={hasKeyframeAtPlayhead('beauty.eyeEnlarge')}
 												onClick={() => toggleKeyframe('beauty.eyeEnlarge', beauty().eyeEnlarge)}
 												disabled={currentLocalTime() === null}
@@ -2546,7 +2611,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Next Eye Enlarge keyframe"
+												aria-label={keyframeAria.next(copy().eyeEnlarge)}
 												onClick={() => seekKeyframe('beauty.eyeEnlarge', 1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.eyeEnlarge']?.length}
 											>
@@ -2556,7 +2621,7 @@ export function Inspector(props: InspectorProps) {
 									</div>
 									<div class="effect-slider">
 										<div class="effect-slider-label">
-											<span>Nose Width</span>
+											<span>{copy().noseWidth}</span>
 											<span class="effect-slider-value tabular-nums">
 												{beauty().noseWidth.toFixed(2)}
 											</span>
@@ -2565,7 +2630,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Previous Nose Width keyframe"
+												aria-label={keyframeAria.previous(copy().noseWidth)}
 												onClick={() => seekKeyframe('beauty.noseWidth', -1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.noseWidth']?.length}
 											>
@@ -2574,7 +2639,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class={`keyframe-toggle${hasKeyframeAtPlayhead('beauty.noseWidth') ? ' is-active' : ''}`}
-												aria-label="Toggle Nose Width keyframe"
+												aria-label={keyframeAria.toggle(copy().noseWidth)}
 												aria-pressed={hasKeyframeAtPlayhead('beauty.noseWidth')}
 												onClick={() => toggleKeyframe('beauty.noseWidth', beauty().noseWidth)}
 												disabled={currentLocalTime() === null}
@@ -2599,7 +2664,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Next Nose Width keyframe"
+												aria-label={keyframeAria.next(copy().noseWidth)}
 												onClick={() => seekKeyframe('beauty.noseWidth', 1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.noseWidth']?.length}
 											>
@@ -2609,7 +2674,7 @@ export function Inspector(props: InspectorProps) {
 									</div>
 									<div class="effect-slider">
 										<div class="effect-slider-label">
-											<span>Mouth</span>
+											<span>{copy().mouth}</span>
 											<span class="effect-slider-value tabular-nums">
 												{beauty().mouth.toFixed(2)}
 											</span>
@@ -2618,7 +2683,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Previous Mouth keyframe"
+												aria-label={keyframeAria.previous(copy().mouth)}
 												onClick={() => seekKeyframe('beauty.mouth', -1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.mouth']?.length}
 											>
@@ -2627,7 +2692,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class={`keyframe-toggle${hasKeyframeAtPlayhead('beauty.mouth') ? ' is-active' : ''}`}
-												aria-label="Toggle Mouth keyframe"
+												aria-label={keyframeAria.toggle(copy().mouth)}
 												aria-pressed={hasKeyframeAtPlayhead('beauty.mouth')}
 												onClick={() => toggleKeyframe('beauty.mouth', beauty().mouth)}
 												disabled={currentLocalTime() === null}
@@ -2652,7 +2717,7 @@ export function Inspector(props: InspectorProps) {
 											<button
 												type="button"
 												class="keyframe-nav"
-												aria-label="Next Mouth keyframe"
+												aria-label={keyframeAria.next(copy().mouth)}
 												onClick={() => seekKeyframe('beauty.mouth', 1)}
 												disabled={!props.selectedClip?.keyframes?.['beauty.mouth']?.length}
 											>
@@ -2669,16 +2734,16 @@ export function Inspector(props: InspectorProps) {
 			<Show when={props.metadata} keyed>
 				{(meta) => (
 					<>
-						<h3 class="panel-subtitle">Source</h3>
+						<h3 class="panel-subtitle">{copy().source}</h3>
 						<dl class="metadata-list">
-							<dt>Duration</dt>
+							<dt>{copy().duration}</dt>
 							<dd class="tabular-nums">{meta.duration.toFixed(2)}s</dd>
-							<dt>Tracks</dt>
+							<dt>{copy().tracks}</dt>
 							<dd>{meta.trackCount}</dd>
 							<Show when={meta.video} keyed>
 								{(video) => (
 									<>
-										<dt>Video</dt>
+										<dt>{copy().video}</dt>
 										<dd>
 											{video.width}×{video.height}
 											{video.codec ? ` · ${video.codec}` : ''}
@@ -2690,7 +2755,7 @@ export function Inspector(props: InspectorProps) {
 							<Show when={meta.audio} keyed>
 								{(audio) => (
 									<>
-										<dt>Audio</dt>
+										<dt>{copy().audio}</dt>
 										<dd>
 											{audio.channels} ch · {audio.sampleRate} Hz
 											{audio.codec ? ` · ${audio.codec}` : ''}
@@ -2706,10 +2771,10 @@ export function Inspector(props: InspectorProps) {
 			<Show when={props.selectedTransition} keyed>
 				{(transition) => (
 					<>
-						<h3 class="panel-subtitle">Transition</h3>
+						<h3 class="panel-subtitle">{copy().transition}</h3>
 						<div class="inspector-section">
 							<label class="inspector-label">
-								<span>Kind</span>
+								<span>{copy().kind}</span>
 								<select
 									class="inspector-select"
 									value={transition.kind}
@@ -2720,14 +2785,14 @@ export function Inspector(props: InspectorProps) {
 										)
 									}
 								>
-									<option value="cross-dissolve">Cross Dissolve</option>
-									<option value="dip-to-black">Dip to Black</option>
-									<option value="wipe">Wipe</option>
-									<option value="slide">Slide</option>
+									<option value="cross-dissolve">{copy().transitionCrossDissolve}</option>
+									<option value="dip-to-black">{copy().transitionDipToBlack}</option>
+									<option value="wipe">{copy().transitionWipe}</option>
+									<option value="slide">{copy().transitionSlide}</option>
 								</select>
 							</label>
 							<label class="inspector-label">
-								<span>Duration</span>
+								<span>{copy().duration}</span>
 								<div class="inspector-slider-row">
 									<input
 										type="range"
@@ -2752,7 +2817,7 @@ export function Inspector(props: InspectorProps) {
 								class="inspector-button is-danger"
 								onClick={() => props.onRemoveTransition?.(transition.transitionId)}
 							>
-								Remove Transition
+								{copy().removeTransition}
 							</button>
 						</div>
 					</>

@@ -1,4 +1,5 @@
 import { For, Show, type JSX } from 'solid-js';
+import { studioCopy, studioLocale } from './locale';
 
 interface CaptureUnavailableNoticeProps {
 	/** What is unavailable, e.g. "Recording" or "Program Mode". */
@@ -23,6 +24,7 @@ interface CaptureUnavailableNoticeProps {
  * without the panel becoming a reason dump.
  */
 export function CaptureUnavailableNotice(props: CaptureUnavailableNoticeProps) {
+	const copy = () => studioCopy(studioLocale());
 	const count = () => props.reasons.length;
 	// No `role="status"`/live region here: the notice holds an interactive
 	// `<details>` disclosure (ARIA forbids interactive controls inside a status
@@ -32,16 +34,19 @@ export function CaptureUnavailableNotice(props: CaptureUnavailableNoticeProps) {
 		<div class="capture-unavailable">
 			<p class="capture-unavailable-status">
 				<span class="capture-unavailable-dot" aria-hidden="true" />
-				<span>{props.subject} unavailable</span>
+				<span>{copy().subjectUnavailable.replace('{subject}', props.subject)}</span>
 				<Show when={count() > 0}>
 					<span class="capture-unavailable-count">
-						{count()} requirement{count() === 1 ? '' : 's'}
+						{(count() === 1 ? copy().requirementCountOne : copy().requirementCountMany).replace(
+							'{n}',
+							String(count())
+						)}
 					</span>
 				</Show>
 			</p>
 			<Show when={count() > 0}>
 				<details class="capture-unavailable-details">
-					<summary>View requirements</summary>
+					<summary>{copy().viewRequirements}</summary>
 					<ul>
 						<For each={props.reasons}>{(reason) => <li>{reason}</li>}</For>
 					</ul>

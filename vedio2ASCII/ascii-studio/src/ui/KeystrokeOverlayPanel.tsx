@@ -28,6 +28,7 @@ import {
 } from '../engine/capture/key-overlay-generator';
 import { readCaptureEventsSidecar } from '../engine/capture/events-sidecar';
 import type { WorkerCommand, TitleStyleSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 export interface KeystrokeOverlayPanelProps {
 	sendCommand: (cmd: WorkerCommand) => void;
@@ -57,6 +58,7 @@ function formatStamp(s: number): string {
 }
 
 export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [optedIn, setOptedIn] = createSignal(false);
 	const [recording, setRecording] = createSignal(false);
 	const [entries, setEntries] = createSignal<CaptureEventLogEntry[]>([]);
@@ -79,13 +81,13 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 
 	function startRecording() {
 		if (!optedIn()) {
-			setError('You must opt in to recording shortcuts before starting.');
+			setError(copy().mustOptIn);
 			return;
 		}
 		if (props.captureRecording) {
 			// Belt-and-suspenders: the button is disabled when capture is recording,
 			// but block here too in case the prop flips while the panel is open.
-			setError('A capture session is running — its DOM tap is already recording your shortcuts.');
+			setError(copy().captureRunningBlock);
 			return;
 		}
 		setError(null);
@@ -110,9 +112,7 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 		try {
 			const sidecar = await readCaptureEventsSidecar(sessionId);
 			if (sidecar === null) {
-				setError(
-					`No events sidecar found for session ${sessionId}. The capture finished before any shortcuts were pressed, or the sidecar failed to open.`
-				);
+				setError(copy().noSidecar.replace('{id}', sessionId));
 				return;
 			}
 			// Filter to key entries only — the overlay generator ignores other kinds,
@@ -122,7 +122,7 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 			setSource('sidecar');
 			setSidecarSessionId(sessionId);
 		} catch (err) {
-			setError(`Failed to read events sidecar: ${String(err)}`);
+			setError(copy().failedReadSidecar.replace('{error}', String(err)));
 		} finally {
 			setLoadingSidecar(false);
 		}
@@ -191,22 +191,20 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 	};
 
 	const manualDisabledReason = (): string | null => {
-		if (props.captureRecording)
-			return 'A capture session is recording — the DOM tap covers shortcut logging.';
-		if (source() === 'sidecar')
-			return 'Showing events from a landed capture session. Clear to record manually.';
+		if (props.captureRecording) return copy().manualDisabledRecording;
+		if (source() === 'sidecar') return copy().manualDisabledSidecar;
 		return null;
 	};
 
 	return (
-		<div class="keystroke-overlay-panel" role="region" aria-label="Keystroke Overlay">
+		<div class="keystroke-overlay-panel" role="region" aria-label={copy().keystrokeOverlayTitle}>
 			<div class="keystroke-overlay-header">
-				<h3>Keystroke Overlay</h3>
+				<h3>{copy().keystrokeOverlayTitle}</h3>
 				<button
 					type="button"
 					class="keystroke-overlay-close"
-					aria-label="Close keystroke overlay panel"
-					title="Close keystroke overlay panel"
+					aria-label={copy().closeKeystrokeOverlayPanel}
+					title={copy().closeKeystrokeOverlayPanel}
 					onClick={handleClose}
 				>
 					×
@@ -214,17 +212,17 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 			</div>
 
 			<p class="keystroke-overlay-desc">
-				Records non-text shortcuts (modifier combos, function keys, navigation) while you narrate.
-				Printable text (e.g. typing into a form) is never captured. Generated clips appear as a new{' '}
-				<strong>Keystrokes</strong> overlay track at the top of the timeline and can be edited like
-				any other title clip ({KEY_OVERLAY_DURATION_S.toFixed(1)} s each, monospace style).
+				{copy().overlayDescPrefix}
+				<strong>Keystrokes</strong>
+				{copy().overlayDescSuffix.replace('{duration}', KEY_OVERLAY_DURATION_S.toFixed(1))}
 			</p>
 
 			<Show when={props.landedSessionId && source() !== 'sidecar' && !props.captureRecording}>
 				<div class="keystroke-overlay-sidecar-prompt">
 					<p>
-						A capture session landed (<code>{props.landedSessionId}</code>). The session's DOM tap
-						recorded shortcut events into a sidecar; loading them here skips the manual record step.
+						{copy().sidecarPromptPrefix}
+						<code>{props.landedSessionId}</code>
+						{copy().sidecarPromptSuffix}
 					</p>
 					<Button
 						variant="default"
@@ -232,17 +230,13 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 							void loadFromSidecar();
 						}}
 						disabled={loadingSidecar() || props.sidecarReady === false}
-						title={
-							props.sidecarReady === false
-								? 'Waiting for the recording’s events sidecar to flush…'
-								: undefined
-						}
+						title={props.sidecarReady === false ? copy().waitingFlush : undefined}
 					>
 						{loadingSidecar()
-							? 'Loading…'
+							? copy().loading
 							: props.sidecarReady === false
-								? 'Waiting for sidecar…'
-								: 'Load events from last recording'}
+								? copy().waitingSidecar
+								: copy().loadEventsFromLastRecording}
 					</Button>
 				</div>
 			</Show>
@@ -254,7 +248,9 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 					aria-live="polite"
 					aria-atomic="true"
 				>
-					Showing events from session <code>{sidecarSessionId()}</code>.
+					{copy().showingEventsSessionPrefix}
+					<code>{sidecarSessionId()}</code>
+					{copy().showingEventsSessionSuffix}
 				</div>
 			</Show>
 
@@ -265,7 +261,7 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 					onChange={(e) => setOptedIn(e.currentTarget.checked)}
 					disabled={recording() || !!manualDisabledReason()}
 				/>
-				<span>I understand and want to record shortcuts.</span>
+				<span>{copy().optInLabel}</span>
 			</label>
 
 			<div class="keystroke-overlay-actions">
@@ -273,7 +269,7 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 					when={!recording()}
 					fallback={
 						<Button variant="default" onClick={stopRecording}>
-							Stop recording
+							{copy().stopRecording}
 						</Button>
 					}
 				>
@@ -283,7 +279,7 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 						disabled={!optedIn() || !!manualDisabledReason()}
 						title={manualDisabledReason() ?? undefined}
 					>
-						Start recording
+						{copy().startRecording}
 					</Button>
 				</Show>
 				<Button
@@ -291,10 +287,10 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 					disabled={entries().length === 0 || recording()}
 					onClick={insertOverlay}
 				>
-					Insert overlay clips ({entries().length})
+					{copy().insertOverlayClips.replace('{n}', String(entries().length))}
 				</Button>
 				<Button variant="secondary" disabled={entries().length === 0} onClick={clearLog}>
-					Clear
+					{copy().clear}
 				</Button>
 			</div>
 
@@ -314,8 +310,8 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 
 			<Show when={recording()}>
 				<div class="keystroke-overlay-status" role="status" aria-live="polite" aria-atomic="true">
-					Recording… press shortcuts in any non-text element. Use <kbd>Stop recording</kbd> when
-					finished.
+					{copy().recordingStatusPrefix} <kbd>{copy().stopRecording}</kbd>{' '}
+					{copy().recordingStatusSuffix}
 				</div>
 			</Show>
 
@@ -324,8 +320,8 @@ export function KeystrokeOverlayPanel(props: KeystrokeOverlayPanelProps) {
 					<table>
 						<thead>
 							<tr>
-								<th>Time</th>
-								<th>Combo</th>
+								<th>{copy().time}</th>
+								<th>{copy().combo}</th>
 							</tr>
 						</thead>
 						<tbody>

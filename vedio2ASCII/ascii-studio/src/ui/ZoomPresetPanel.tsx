@@ -6,6 +6,7 @@
 
 import { createSignal, Show, For } from 'solid-js';
 import type { ClipKeyframesSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 interface ZoomPreset {
 	id: string;
@@ -14,14 +15,6 @@ interface ZoomPreset {
 	x: number;
 	y: number;
 }
-
-const PRESETS: ZoomPreset[] = [
-	{ id: 'zoom-in-centre', label: 'Zoom In (Centre)', scale: 1.6, x: 0, y: 0 },
-	{ id: 'zoom-in-region', label: 'Zoom In (Region)', scale: 1.6, x: 0, y: 0 },
-	{ id: 'zoom-out', label: 'Zoom Out', scale: 1, x: 0, y: 0 },
-	{ id: 'pan-left-right', label: 'Pan L→R', scale: 1.6, x: -0.2, y: 0 },
-	{ id: 'pan-right-left', label: 'Pan R→L', scale: 1.6, x: 0.2, y: 0 }
-];
 
 interface ZoomPresetPanelProps {
 	trackId: string;
@@ -32,6 +25,15 @@ interface ZoomPresetPanelProps {
 }
 
 export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
+	const copy = () => studioCopy(studioLocale());
+	// Preset labels are localized, so the list is built inside the component.
+	const PRESETS: ZoomPreset[] = [
+		{ id: 'zoom-in-centre', label: copy().zoomInCentre, scale: 1.6, x: 0, y: 0 },
+		{ id: 'zoom-in-region', label: copy().zoomInRegion, scale: 1.6, x: 0, y: 0 },
+		{ id: 'zoom-out', label: copy().zoomOut, scale: 1, x: 0, y: 0 },
+		{ id: 'pan-left-right', label: copy().panLeftRight, scale: 1.6, x: -0.2, y: 0 },
+		{ id: 'pan-right-left', label: copy().panRightLeft, scale: 1.6, x: 0.2, y: 0 }
+	];
 	const [scale, setScale] = createSignal(1.6);
 	const [x, setX] = createSignal(0);
 	const [y, setY] = createSignal(0);
@@ -90,7 +92,7 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 
 	return (
 		<section class="inspector-section">
-			<h3>Zoom-n-Pan</h3>
+			<h3>{copy().zoomPan}</h3>
 
 			<div class="preset-buttons">
 				<For each={PRESETS}>
@@ -109,7 +111,7 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 
 			<div class="preset-params">
 				<label>
-					Scale
+					{copy().scale}
 					<input
 						type="number"
 						value={scale()}
@@ -142,7 +144,7 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 					/>
 				</label>
 				<label>
-					Entry (ms)
+					{copy().entryMs}
 					<input
 						type="number"
 						value={entryRampMs()}
@@ -153,7 +155,7 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 					/>
 				</label>
 				<label>
-					Hold (ms)
+					{copy().holdMs}
 					<input
 						type="number"
 						value={holdMs()}
@@ -164,7 +166,7 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 					/>
 				</label>
 				<label>
-					Exit (ms)
+					{copy().exitMs}
 					<input
 						type="number"
 						value={exitRampMs()}
@@ -178,20 +180,18 @@ export function ZoomPresetPanel(props: ZoomPresetPanelProps) {
 
 			<Show when={showWarning()}>
 				<div class="warning-dialog" role="alertdialog">
-					<p>
-						Existing keyframes will be merged — existing values outside this range are preserved.
-					</p>
+					<p>{copy().mergeWarning}</p>
 					<button type="button" onClick={handleApply}>
-						Apply merge
+						{copy().applyMerge}
 					</button>
 					<button type="button" onClick={() => setShowWarning(false)}>
-						Cancel
+						{copy().cancel}
 					</button>
 				</div>
 			</Show>
 
 			<button type="button" class="apply-btn" onClick={handleApply}>
-				Apply
+				{copy().apply}
 			</button>
 		</section>
 	);

@@ -6790,6 +6790,27 @@ function handleQueueCancelAll() {
 	scheduleAutosave();
 }
 
+/**
+ * Stop the queue after the current job without discarding the remaining
+ * pending jobs: `handleQueueStart` re-runs them on the next start, which is
+ * what the UI's "queue paused — pre-select output files" flow needs after a
+ * lost picker activation. This is the `queue-pause` contract (pause, not
+ * cancel); wiring it to {@link handleQueueCancelAll} used to drop every queued
+ * job while the UI only reported "paused".
+ */
+function handleQueuePause() {
+	queueJobOutputHandles.clear();
+	queueJobOutputDirs.clear();
+	if (queueJobAbort) {
+		queueJobAbort.abort();
+	} else if (queueJobOutputResolve && queueJobOutputJobId) {
+		resolveWaitingQueueOutput(queueJobOutputJobId, null);
+	}
+	queueRunning = false;
+	postQueueState();
+	scheduleAutosave();
+}
+
 function handleQueueRetry(cmd: Extract<WorkerCommand, { type: 'queue-retry' }>) {
 	queueState = retryJob(queueState, cmd.jobId);
 	postQueueState();
@@ -9595,7 +9616,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerCommand>) => {
 			handleQueueJobSkip(cmd);
 			break;
 		case 'queue-pause':
-			handleQueueCancelAll();
+			handleQueuePause();
 			break;
 		case 'queue-set-stop-on-error':
 			handleQueueSetStopOnError(cmd);

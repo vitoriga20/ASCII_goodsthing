@@ -4,6 +4,7 @@ import type { CapabilityFeatureInfo, CapabilityTier } from './capabilities';
 import type { CapabilityProbeResult } from '../protocol';
 import { Button } from './components/button';
 import { CapabilityMatrixPanel } from './CapabilityMatrixPanel';
+import { studioCopy, studioLocale } from './locale';
 
 interface CapabilityPanelProps {
 	open: boolean;
@@ -21,6 +22,7 @@ interface CapabilityPanelProps {
 }
 
 export function CapabilityPanel(props: CapabilityPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	let panelRef: HTMLElement | undefined;
 
 	createEffect(() => {
@@ -72,16 +74,16 @@ export function CapabilityPanel(props: CapabilityPanelProps) {
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="capability-panel-title">
-							Browser capabilities
+							{copy().browserCapabilities}
 						</p>
-						<p class="capability-panel-tier">Active tier: {props.tierLabel}</p>
+						<p class="capability-panel-tier">{copy().activeTier.replace('{x}', props.tierLabel)}</p>
 					</div>
 					<Button
 						size="icon"
 						variant="ghost"
 						onClick={props.onClose}
-						aria-label="Close capability panel"
-						title="Close capability panel"
+						aria-label={copy().closeCapabilityPanel}
+						title={copy().closeCapabilityPanel}
 					>
 						<X size={16} aria-hidden="true" />
 					</Button>
@@ -93,15 +95,17 @@ export function CapabilityPanel(props: CapabilityPanelProps) {
 
 				<Show when={props.onOpenGuide}>
 					<button type="button" class="export-why-link" onClick={() => props.onOpenGuide?.()}>
-						Read about browser limitations in the user guide
+						{copy().readAboutBrowserLimitations}
 					</button>
 				</Show>
 
 				<Show when={props.compatibilityPreviewAvailable && props.tier === 'limited'}>
 					<p class="capability-panel-note">
 						{props.previewReady
-							? `Reduced preview${props.exportReady ? ' and export are' : ' is'} available in this browser tier. Advanced GPU effects remain limited.`
-							: 'Compatibility import can still show a reduced thumbnail for inspection, but timeline preview and export are unavailable.'}
+							? props.exportReady
+								? copy().reducedPreviewAndExportAre
+								: copy().reducedPreviewIs
+							: copy().compatibilityImportThumbnail}
 					</p>
 				</Show>
 

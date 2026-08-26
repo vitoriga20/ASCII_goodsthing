@@ -4,18 +4,21 @@ import {
 	CAPTURE_SIDE_RAIL_TABS,
 	SIDE_RAIL_TABS,
 	TEXT_SIDE_RAIL_TABS,
+	audioSideRailTabLabel,
+	captureSideRailTabLabel,
 	isSideRailTab,
 	migrateLegacySideRailTab,
 	sideRailTabLabel,
 	sideRailTabPanelId,
 	sideRailTabTriggerId,
+	textSideRailTabLabel,
 	visibleTextSideRailTabs
 } from './side-rail-tabs';
 
 describe('SIDE_RAIL_TABS (IA-T4 / D10-D14 right-rail destinations)', () => {
 	it('collapses the primary rail to four job destinations', () => {
 		expect(SIDE_RAIL_TABS.map((tab) => tab.id)).toEqual(['inspector', 'text', 'audio', 'capture']);
-		expect(SIDE_RAIL_TABS.map((tab) => tab.label)).toEqual([
+		expect(SIDE_RAIL_TABS.map((tab) => sideRailTabLabel(tab.id))).toEqual([
 			'Inspector',
 			'Text',
 			'Audio',
@@ -38,16 +41,23 @@ describe('SIDE_RAIL_TABS (IA-T4 / D10-D14 right-rail destinations)', () => {
 	});
 
 	it('keeps the audio labels disambiguated', () => {
-		const labels: readonly string[] = SIDE_RAIL_TABS.map((tab) => tab.label);
-		const audioLabels: readonly string[] = AUDIO_SIDE_RAIL_TABS.map((tab) => tab.label);
+		const labels: readonly string[] = SIDE_RAIL_TABS.map((tab) => sideRailTabLabel(tab.id));
 		expect(labels).not.toContain('Cleanup');
-		expect(audioLabels).toContain('Voice FX');
-		expect(audioLabels).toContain('Live Chain');
+		expect(audioSideRailTabLabel('voice-fx')).toBe('Voice FX');
+		expect(audioSideRailTabLabel('live-chain')).toBe('Live Chain');
+	});
+
+	it('resolves English labels for every secondary destination by default', () => {
+		expect(textSideRailTabLabel('captions')).toBe('Captions');
+		expect(textSideRailTabLabel('language-tools')).toBe('Language Tools');
+		expect(captureSideRailTabLabel('record')).toBe('Record');
+		expect(captureSideRailTabLabel('program')).toBe('Program');
+		expect(captureSideRailTabLabel('publish')).toBe('Go Live');
 	});
 
 	it('uses a unique id and label per tab (one home per concept)', () => {
 		const ids = SIDE_RAIL_TABS.map((tab) => tab.id);
-		const labels = SIDE_RAIL_TABS.map((tab) => tab.label);
+		const labels = SIDE_RAIL_TABS.map((tab) => sideRailTabLabel(tab.id));
 		expect(new Set(ids).size).toBe(ids.length);
 		expect(new Set(labels).size).toBe(labels.length);
 	});

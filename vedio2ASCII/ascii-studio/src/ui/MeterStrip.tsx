@@ -1,5 +1,6 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 import { levelToDb, meterHeightPercent, startMeterReader } from './meters';
+import { studioCopy, studioLocale } from './locale';
 
 interface MeterStripProps {
 	meterSab: SharedArrayBuffer | null;
@@ -25,6 +26,7 @@ function MeterBar(props: { label: string; peak: () => number; rms: () => number 
 }
 
 export function MeterStrip(props: MeterStripProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [peakL, setPeakL] = createSignal(0);
 	const [peakR, setPeakR] = createSignal(0);
 	const [rmsL, setRmsL] = createSignal(0);
@@ -50,7 +52,7 @@ export function MeterStrip(props: MeterStripProps) {
 	});
 
 	return (
-		<div class="meter-strip" role="meter" aria-label="Master output levels">
+		<div class="meter-strip" role="meter" aria-label={copy().masterOutputLevels}>
 			<MeterBar label="L" peak={peakL} rms={rmsL} />
 			<MeterBar label="R" peak={peakR} rms={rmsR} />
 		</div>

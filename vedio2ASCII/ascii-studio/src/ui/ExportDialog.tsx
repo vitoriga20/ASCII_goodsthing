@@ -58,7 +58,7 @@ interface ExportDialogProps {
 }
 
 function formatDuration(seconds: number | null): string {
-	if (seconds === null) return 'ETA pending';
+	if (seconds === null) return studioCopy(studioLocale()).etaPending;
 	const rounded = Math.max(0, Math.round(seconds));
 	const minutes = Math.floor(rounded / 60);
 	const secs = rounded % 60;
@@ -96,20 +96,21 @@ const CODEC_OPTIONS: readonly ExportCodecSupport[] = [
 ];
 
 function disabledCodecReason(codec: ExportVideoCodec, probe: CapabilityProbeResult | null): string {
-	if (!probe) return 'Codec support has not been probed yet.';
+	const copy = () => studioCopy(studioLocale());
+	if (!probe) return copy().codecNotProbed;
 	switch (codec) {
 		case 'h264':
 			return probe.codecs.h264Encode === 'supported'
-				? 'MP4 muxing unavailable for this browser tier.'
-				: 'H.264 encode is not available in this browser tier.';
+				? copy().mp4MuxUnavailable
+				: copy().h264EncodeUnavailable;
 		case 'vp9':
 			return probe.codecs.vp9Encode === 'supported'
-				? 'WebM muxing unavailable for this browser tier.'
-				: 'VP9 encode is not available in this browser tier.';
+				? copy().webmMuxUnavailable
+				: copy().vp9EncodeUnavailable;
 		case 'av1':
 			return probe.tier === 'core-webgpu'
-				? 'AV1 encode is not supported by this hardware or driver.'
-				: 'AV1 export is reserved for the core WebGPU tier.';
+				? copy().av1EncodeUnsupported
+				: copy().av1Reserved;
 	}
 }
 
@@ -275,7 +276,7 @@ export function ExportDialog(props: ExportDialogProps) {
 			setRangeError(null);
 			return true;
 		}
-		setRangeError('Out must be greater than In.');
+		setRangeError(copy().rangeOrder);
 		return false;
 	}
 
@@ -348,19 +349,19 @@ export function ExportDialog(props: ExportDialogProps) {
 			onOpenChange={(details) => handleOpenChange(details.open)}
 			positioning={{ placement: 'bottom-end', gutter: 7 }}
 		>
-			<Popover.Trigger class={buttonVariants()} disabled={!props.hasMedia}>
-				<Download size={14} aria-hidden="true" />
-				Export
-			</Popover.Trigger>
+<Popover.Trigger class={buttonVariants()} disabled={!props.hasMedia}>
+					<Download size={14} aria-hidden="true" />
+					{copy().export}
+				</Popover.Trigger>
 			<Portal>
 				<Popover.Positioner>
 					<Popover.Content class="export-popover panel" aria-label={copy().export}>
 						{/* Saved presets selector */}
 						<Show when={props.presets.length > 0}>
-							<p class="export-eyebrow">
-								Saved preset{' '}
-								<span class="text-xs text-muted-foreground font-normal">(Experimental)</span>
-							</p>
+<p class="export-eyebrow">
+									{copy().savedPreset}{' '}
+									<span class="text-xs text-muted-foreground font-normal">({copy().experimental})</span>
+								</p>
 							<div class="export-preset-selector">
 								<select
 									class="export-select"
@@ -376,7 +377,7 @@ export function ExportDialog(props: ExportDialogProps) {
 										if (preset) applyExportPreset(preset);
 									}}
 								>
-									<option value="">Custom</option>
+									<option value="">{copy().customPreset}</option>
 									<For each={props.presets}>
 										{(preset) => (
 											<option value={preset.id}>
@@ -395,7 +396,7 @@ export function ExportDialog(props: ExportDialogProps) {
 									<button
 										type="button"
 										class="export-preset-delete"
-										aria-label="Delete preset"
+										aria-label={copy().deletePresetAria}
 										disabled={props.exporting}
 										onClick={() => {
 											const id = selectedPresetId();
@@ -411,12 +412,14 @@ export function ExportDialog(props: ExportDialogProps) {
 							</div>
 						</Show>
 
-						<Show when={aspectMismatch()}>
-							<p class="export-aspect-warning" role="alert">
-								Export dimensions ({settings().width}×{settings().height}) do not match project
-								format ({props.projectAspect}). The output may appear letterboxed.
-							</p>
-						</Show>
+<Show when={aspectMismatch()}>
+								<p class="export-aspect-warning" role="alert">
+									{copy()
+										.exportAspectWarning.replace('{w}', String(settings().width))
+										.replace('{h}', String(settings().height))
+										.replace('{aspect}', props.projectAspect)}
+								</p>
+							</Show>
 						<Show when={platformCodecResolution() && 'blocked' in platformCodecResolution()!}>
 							<p class="export-preset-blocked" role="alert">
 								{
@@ -437,13 +440,13 @@ export function ExportDialog(props: ExportDialogProps) {
 									settings().codec
 							}
 						>
-							<p class="export-aspect-warning" role="status" aria-live="polite" aria-atomic="true">
-								H.264 is not supported on this device; falling back to VP9 in WebM container.
-							</p>
+<p class="export-aspect-warning" role="status" aria-live="polite" aria-atomic="true">
+									{copy().codecFallback}
+								</p>
 						</Show>
 
-						<p class="export-eyebrow">Export preset</p>
-						<div class="export-presets" role="group" aria-label="Export preset">
+<p class="export-eyebrow">{copy().exportPreset}</p>
+							<div class="export-presets" role="group" aria-label={copy().exportPreset}>
 							<button
 								type="button"
 								class={`segmented-btn${settings().preset === 'quality' ? ' is-active' : ''}`}
@@ -454,8 +457,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									setSelectedPresetId(null);
 								}}
 							>
-								Quality
-							</button>
+{copy().presetQuality}
+								</button>
 							<button
 								type="button"
 								class={`segmented-btn${settings().preset === 'fast' ? ' is-active' : ''}`}
@@ -466,12 +469,12 @@ export function ExportDialog(props: ExportDialogProps) {
 									setSelectedPresetId(null);
 								}}
 							>
-								Fast
-							</button>
+{copy().presetFast}
+								</button>
 						</div>
 
-						<p class="export-eyebrow">Codec</p>
-						<div class="export-codecs" role="group" aria-label="Export codec">
+<p class="export-eyebrow">{copy().codec}</p>
+							<div class="export-codecs" role="group" aria-label={copy().codecGroup}>
 							<For each={CODEC_OPTIONS}>
 								{(entry) => {
 									const supported = createMemo(() =>
@@ -500,11 +503,10 @@ export function ExportDialog(props: ExportDialogProps) {
 						<Show when={nonCoreProbe()}>
 							{(probe) => (
 								<details class="export-tier-constraints" open>
-									<summary>Current tier constraints</summary>
-									<p class="export-note">
-										{probe().tier} limits export to codecs and containers that this browser can
-										encode and mux.
-									</p>
+<summary>{copy().tierConstraints}</summary>
+										<p class="export-note">
+											{copy().tierLimits.replace('{tier}', probe().tier)}
+										</p>
 									<ul>
 										<For
 											each={CODEC_OPTIONS.filter(
@@ -522,15 +524,15 @@ export function ExportDialog(props: ExportDialogProps) {
 										</For>
 									</ul>
 									<button type="button" class="export-why-link" onClick={props.onWhyConstraints}>
-										Why?
+										{copy().why}
 									</button>
 								</details>
 							)}
 						</Show>
 
 						<div class="export-fields">
-							<label class="export-field">
-								<span>Width</span>
+<label class="export-field">
+									<span>{copy().width}</span>
 								<input
 									type="number"
 									min="2"
@@ -546,8 +548,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									}}
 								/>
 							</label>
-							<label class="export-field">
-								<span>Height</span>
+<label class="export-field">
+									<span>{copy().height}</span>
 								<input
 									type="number"
 									min="2"
@@ -580,8 +582,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									}}
 								/>
 							</label>
-							<label class="export-field">
-								<span>Bitrate (Mbps)</span>
+<label class="export-field">
+									<span>{copy().bitrate}</span>
 								<input
 									type="number"
 									min="0.1"
@@ -619,11 +621,11 @@ export function ExportDialog(props: ExportDialogProps) {
 											setSelectedPresetId(null);
 										}}
 									/>
-									<span>FPS upconvert (ML)</span>
+									<span>{copy().fpsUpconvert}</span>
 								</label>
 								<Show when={settings().interpolation}>
-									<label class="export-field">
-										<span>Target FPS</span>
+<label class="export-field">
+											<span>{copy().targetFps}</span>
 										<input
 											type="number"
 											min="1"
@@ -665,15 +667,15 @@ export function ExportDialog(props: ExportDialogProps) {
 												setSelectedPresetId(null);
 											}}
 										/>
-										<span>Motion blur</span>
+										<span>{copy().motionBlur}</span>
 									</label>
 								</Show>
 							</Show>
 						</div>
 
 						{/* Range mode */}
-						<p class="export-eyebrow">Range</p>
-						<div class="export-presets" role="group" aria-label="Export range">
+<p class="export-eyebrow">{copy().rangeSection}</p>
+							<div class="export-presets" role="group" aria-label={copy().exportRangeGroup}>
 							<button
 								type="button"
 								class={`segmented-btn${rangeMode() === 'full' ? ' is-active' : ''}`}
@@ -685,8 +687,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									setRangeError(null);
 								}}
 							>
-								Full
-							</button>
+{copy().rangeFull}
+								</button>
 							<button
 								type="button"
 								class={`segmented-btn${rangeMode() === 'range' ? ' is-active' : ''}`}
@@ -698,8 +700,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									setRangeError(null);
 								}}
 							>
-								Range
-							</button>
+{copy().rangeRange}
+								</button>
 							<Show when={props.markers.length >= 2}>
 								<button
 									type="button"
@@ -712,15 +714,15 @@ export function ExportDialog(props: ExportDialogProps) {
 										setRangeError(null);
 									}}
 								>
-									Markers
-								</button>
+{copy().rangeMarkers}
+									</button>
 							</Show>
 						</div>
 
 						<Show when={rangeMode() === 'range'}>
 							<div class="export-fields">
-								<label class="export-field">
-									<span>In (s)</span>
+<label class="export-field">
+										<span>{copy().rangeIn}</span>
 									<input
 										type="number"
 										min="0"
@@ -734,8 +736,8 @@ export function ExportDialog(props: ExportDialogProps) {
 										}}
 									/>
 								</label>
-								<label class="export-field">
-									<span>Out (s)</span>
+<label class="export-field">
+										<span>{copy().rangeOut}</span>
 									<input
 										type="number"
 										min="0"
@@ -750,17 +752,21 @@ export function ExportDialog(props: ExportDialogProps) {
 									/>
 								</label>
 							</div>
-							<Show when={rangeError() ?? (rangeInvalid() ? 'Out must be greater than In.' : null)}>
+							<Show when={rangeError() ?? (rangeInvalid() ? copy().rangeOrder : null)}>
 								{(message) => <p class="export-error">{message()}</p>}
 							</Show>
 						</Show>
 
-						<Show when={rangeMode() === 'markers'}>
-							<p class="export-note">
-								{props.markers.length} markers — {props.markers.length - 1} range
-								{props.markers.length - 1 !== 1 ? 's' : ''} will be queued
-							</p>
-						</Show>
+<Show when={rangeMode() === 'markers'}>
+								<p class="export-note">
+									{(props.markers.length - 1 === 1
+										? copy().markersQueuedOne
+										: copy().markersQueuedMany
+									)
+										.replace('{m}', String(props.markers.length))
+										.replace('{n}', String(props.markers.length - 1))}
+								</p>
+							</Show>
 
 						<Show when={props.progress}>
 							{(progress) => (
@@ -773,7 +779,7 @@ export function ExportDialog(props: ExportDialogProps) {
 									<div class="export-estimate">
 										<span>{formatDuration(progress().etaSeconds)}</span>
 										<Show when={progress().subRealtime && progress().etaSeconds !== null}>
-											<span>Sub-real-time on this hardware</span>
+											<span>{copy().subRealtime}</span>
 										</Show>
 									</div>
 								</div>
@@ -806,7 +812,7 @@ export function ExportDialog(props: ExportDialogProps) {
 						<Show when={savingPreset()}>
 							<div class="export-fields" style={{ 'margin-top': '8px' }}>
 								<label class="export-field" style={{ flex: 1 }}>
-									<span>Preset name</span>
+									<span>{copy().presetName}</span>
 									<input
 										type="text"
 										value={presetName()}
@@ -814,11 +820,11 @@ export function ExportDialog(props: ExportDialogProps) {
 										onKeyDown={(e) => {
 											if (e.key === 'Enter') handleSavePreset();
 										}}
-										placeholder="My Preset"
+										placeholder={copy().myPreset}
 									/>
 								</label>
 								<label class="export-field" style={{ flex: 1 }}>
-									<span>Filename template</span>
+									<span>{copy().filenameTemplate}</span>
 									<input
 										type="text"
 										value={presetTemplate()}
@@ -846,7 +852,7 @@ export function ExportDialog(props: ExportDialogProps) {
 									disabled={!presetName().trim()}
 									onClick={handleSavePreset}
 								>
-									Save
+									{copy().save}
 								</Button>
 								<Button
 									onClick={() => {
@@ -854,7 +860,7 @@ export function ExportDialog(props: ExportDialogProps) {
 										setTemplateError(null);
 									}}
 								>
-									Cancel
+									{copy().cancel}
 								</Button>
 							</div>
 						</Show>
@@ -870,8 +876,8 @@ export function ExportDialog(props: ExportDialogProps) {
 								}
 								onClick={handleStart}
 							>
-								Start
-							</Button>
+{copy().start}
+								</Button>
 							<Button
 								disabled={
 									props.exporting ||
@@ -881,18 +887,18 @@ export function ExportDialog(props: ExportDialogProps) {
 								}
 								onClick={handleEnqueue}
 							>
-								<ListPlus size={14} aria-hidden="true" />
-								Add to Queue{' '}
-								<span
-									class="text-xs text-muted-foreground font-normal"
-									title="Render queue is under active development"
-								>
-									(Experimental)
-								</span>
-							</Button>
-							<Show when={props.exporting}>
-								<Button onClick={() => props.onCancel()}>Stop export</Button>
-							</Show>
+<ListPlus size={14} aria-hidden="true" />
+									{copy().addToQueue}{' '}
+									<span
+										class="text-xs text-muted-foreground font-normal"
+										title={copy().renderQueueDevNote}
+									>
+										({copy().experimental})
+									</span>
+								</Button>
+<Show when={props.exporting}>
+									<Button onClick={() => props.onCancel()}>{copy().stopExport}</Button>
+								</Show>
 							<Show when={!savingPreset()}>
 								<Button
 									disabled={props.exporting}
@@ -903,18 +909,18 @@ export function ExportDialog(props: ExportDialogProps) {
 										setSavingPreset(true);
 									}}
 								>
-									<Save size={14} aria-hidden="true" />
-									Save Preset{' '}
-									<span class="text-xs text-muted-foreground font-normal">(Experimental)</span>
-								</Button>
+<Save size={14} aria-hidden="true" />
+										{copy().savePreset}{' '}
+										<span class="text-xs text-muted-foreground font-normal">({copy().experimental})</span>
+									</Button>
 							</Show>
 							<Popover.CloseTrigger
 								class={buttonVariants()}
 								type="button"
 								disabled={props.exporting}
 							>
-								Close
-							</Popover.CloseTrigger>
+{copy().close}
+								</Popover.CloseTrigger>
 						</div>
 						<Show when={props.onOpenGuide}>
 							{/* The popover portals outside the app shell, so close it before the guide covers the editor. */}
@@ -926,8 +932,8 @@ export function ExportDialog(props: ExportDialogProps) {
 									props.onOpenGuide?.();
 								}}
 							>
-								Export guide: codecs, presets, and the render queue
-							</button>
+{copy().exportGuideLink}
+								</button>
 						</Show>
 					</Popover.Content>
 				</Popover.Positioner>
@@ -942,6 +948,7 @@ function ChaptersSection(props: {
 	timelineDuration: number;
 	projectName: string;
 }) {
+	const copy = () => studioCopy(studioLocale());
 	const chapterResult = createMemo(() =>
 		generateChapterText(props.markers, props.timelineDuration)
 	);
@@ -984,7 +991,7 @@ function ChaptersSection(props: {
 					}
 				).showSaveFilePicker({
 					suggestedName: textName,
-					types: [{ description: 'Chapter Text', accept: { 'text/plain': ['.txt'] } }]
+					types: [{ description: copy().chaptersFileType, accept: { 'text/plain': ['.txt'] } }]
 				});
 				const writable = await handle.createWritable();
 				await writable.write(textBlob);
@@ -1013,14 +1020,14 @@ function ChaptersSection(props: {
 					<pre class="chapters-text">{chapterText()}</pre>
 				</div>
 				<div class="chapters-actions">
-					<Button variant="secondary" onClick={handleCopy}>
-						<Copy size={14} aria-hidden="true" />
-						Copy to Clipboard
-					</Button>
-					<Button variant="secondary" onClick={handleSave}>
-						<Download size={14} aria-hidden="true" />
-						Save .chapters.txt
-					</Button>
+<Button variant="secondary" onClick={handleCopy}>
+							<Copy size={14} aria-hidden="true" />
+							{copy().copyToClipboard}
+						</Button>
+						<Button variant="secondary" onClick={handleSave}>
+							<Download size={14} aria-hidden="true" />
+							{copy().saveChaptersTxt}
+						</Button>
 				</div>
 			</Show>
 		</div>

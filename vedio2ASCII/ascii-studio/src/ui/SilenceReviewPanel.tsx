@@ -15,6 +15,7 @@ import type {
 } from '../protocol';
 import { SILENCE_DEFAULTS } from '../engine/silence-detector';
 import { generateId } from '../utils/uuid';
+import { studioCopy, studioLocale } from './locale';
 
 export interface SilenceReviewPanelProps {
 	/** Currently selected audio track IDs (or every audio track if no
@@ -45,6 +46,7 @@ function formatTime(s: number): string {
 }
 
 export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [regions, setRegions] = createSignal<SilenceRegion[]>([]);
 	const [skipped, setSkipped] = createSignal<Set<number>>(new Set<number>());
 	const [applied, setApplied] = createSignal<Set<number>>(new Set<number>());
@@ -112,9 +114,7 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 	function requestClose(): void {
 		if (hasUnreviewed()) {
 			// eslint-disable-next-line no-alert
-			const proceed = window.confirm(
-				'You have unreviewed silence regions. Closing will discard them — detected regions will not be applied to the timeline.'
-			);
+			const proceed = window.confirm(copy().silenceUnreviewedConfirm);
 			if (!proceed) return;
 		}
 		props.onClose?.();
@@ -219,15 +219,15 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 	const audioDisabled = () => props.trackIds.length === 0;
 
 	return (
-		<div class="silence-review-panel" role="region" aria-label="Silence Detection">
+		<div class="silence-review-panel" role="region" aria-label={copy().silenceDetection}>
 			<div class="silence-review-header">
-				<h3>Silence Detection</h3>
+				<h3>{copy().silenceDetection}</h3>
 				{props.onClose && (
 					<button
 						type="button"
 						class="silence-review-close"
-						aria-label="Close silence review panel"
-						title="Close silence review panel"
+						aria-label={copy().closeSilenceReviewPanel}
+						title={copy().closeSilenceReviewPanel}
 						onClick={requestClose}
 					>
 						×
@@ -237,10 +237,10 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 
 			{/* Parameter controls */}
 			<details open={showParams()} onToggle={(e) => setShowParams(e.currentTarget.open)}>
-				<summary>Detection Parameters</summary>
+				<summary>{copy().detectionParams}</summary>
 				<div class="silence-params">
 					<label>
-						<span>Open threshold (dBFS)</span>
+						<span>{copy().openThreshold}</span>
 						<input
 							type="range"
 							min={-60}
@@ -249,12 +249,12 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							value={openThreshold()}
 							disabled={detecting()}
 							onInput={(e) => setOpenThreshold(Number(e.currentTarget.value))}
-							aria-label="Open threshold"
+							aria-label={copy().openThresholdAria}
 						/>
 						<span class="silence-param-value">{openThreshold()}</span>
 					</label>
 					<label>
-						<span>Close threshold (dBFS)</span>
+						<span>{copy().closeThreshold}</span>
 						<input
 							type="range"
 							min={-60}
@@ -263,12 +263,12 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							value={closeThreshold()}
 							disabled={detecting()}
 							onInput={(e) => setCloseThreshold(Number(e.currentTarget.value))}
-							aria-label="Close threshold"
+							aria-label={copy().closeThresholdAria}
 						/>
 						<span class="silence-param-value">{closeThreshold()}</span>
 					</label>
 					<label>
-						<span>Min silence (s)</span>
+						<span>{copy().minSilence}</span>
 						<input
 							type="range"
 							min={0.1}
@@ -277,12 +277,12 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							value={minSilence()}
 							disabled={detecting()}
 							onInput={(e) => setMinSilence(Number(e.currentTarget.value))}
-							aria-label="Minimum silence duration"
+							aria-label={copy().minSilenceAria}
 						/>
 						<span class="silence-param-value">{minSilence().toFixed(1)}</span>
 					</label>
 					<label>
-						<span>Keep padding (s)</span>
+						<span>{copy().keepPadding}</span>
 						<input
 							type="range"
 							min={0}
@@ -291,12 +291,12 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							value={keepPadding()}
 							disabled={detecting()}
 							onInput={(e) => setKeepPadding(Number(e.currentTarget.value))}
-							aria-label="Keep padding"
+							aria-label={copy().keepPaddingAria}
 						/>
 						<span class="silence-param-value">{keepPadding().toFixed(2)}</span>
 					</label>
 					<label>
-						<span>Min kept segment (s)</span>
+						<span>{copy().minKeptSegment}</span>
 						<input
 							type="range"
 							min={0.1}
@@ -305,7 +305,7 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							value={minKeptSegment()}
 							disabled={detecting()}
 							onInput={(e) => setMinKeptSegment(Number(e.currentTarget.value))}
-							aria-label="Minimum kept segment"
+							aria-label={copy().minKeptSegmentAria}
 						/>
 						<span class="silence-param-value">{minKeptSegment().toFixed(1)}</span>
 					</label>
@@ -318,15 +318,15 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 					variant="default"
 					disabled={detecting() || audioDisabled()}
 					onClick={handleDetect}
-					title={audioDisabled() ? 'Select at least one audio track to detect silence.' : undefined}
+					title={audioDisabled() ? copy().noAudioTrack : undefined}
 				>
-					{detecting() ? 'Detecting…' : 'Detect Silence'}
+					{detecting() ? copy().detecting : copy().detectSilence}
 				</Button>
 				<Show when={!audioDisabled()}>
 					<span class="silence-scope-hint">
 						{props.selectionScope === 'selection'
-							? `Scanning ${props.trackIds.length} selected audio track${props.trackIds.length === 1 ? '' : 's'}.`
-							: `No audio selection — scanning all ${props.trackIds.length} audio track${props.trackIds.length === 1 ? '' : 's'}. Select an audio clip to narrow.`}
+							? copy().scanningSelection.replace('{n}', String(props.trackIds.length))
+							: copy().scanningAll.replace('{n}', String(props.trackIds.length))}
 					</span>
 				</Show>
 			</div>
@@ -349,7 +349,7 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 					<div class="silence-error" role="alert">
 						<p>{err()}</p>
 						<Button variant="secondary" onClick={handleRetry}>
-							Retry
+							{copy().retry}
 						</Button>
 					</div>
 				)}
@@ -361,11 +361,11 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 					<table>
 						<thead>
 							<tr>
-								<th>Start</th>
-								<th>End</th>
-								<th>Duration</th>
-								<th>Peak dB</th>
-								<th>Actions</th>
+								<th>{copy().start}</th>
+								<th>{copy().endLabel}</th>
+								<th>{copy().duration}</th>
+								<th>{copy().peakDb}</th>
+								<th>{copy().actionsLabel}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -391,9 +391,9 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 													class="silence-btn-apply"
 													disabled={isApplied() || isSkipped()}
 													onClick={() => handleApply(i())}
-													aria-label={`Apply region ${i() + 1}`}
+													aria-label={copy().applyRegion.replace('{n}', String(i() + 1))}
 												>
-													{isApplied() ? 'Applied' : 'Apply'}
+													{isApplied() ? copy().applied : copy().apply}
 												</button>
 												<button
 													type="button"
@@ -401,10 +401,12 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 													disabled={isApplied()}
 													onClick={() => toggleSkip(i())}
 													aria-label={
-														isSkipped() ? `Unskip region ${i() + 1}` : `Skip region ${i() + 1}`
+														isSkipped()
+															? copy().unskipRegion.replace('{n}', String(i() + 1))
+															: copy().skipRegion.replace('{n}', String(i() + 1))
 													}
 												>
-													{isSkipped() ? 'Unskip' : 'Skip'}
+													{isSkipped() ? copy().unskip : copy().skip}
 												</button>
 											</td>
 										</tr>
@@ -419,7 +421,7 @@ export function SilenceReviewPanel(props: SilenceReviewPanelProps) {
 							disabled={allResolved() || nonSkippedCount() === 0}
 							onClick={handleApplyAll}
 						>
-							Apply All ({nonSkippedCount()})
+							{copy().applyAllN.replace('{n}', String(nonSkippedCount()))}
 						</Button>
 					</div>
 				</div>

@@ -11,6 +11,7 @@
  *     shown blank.
  */
 
+import { studioCopy, type StudioLocale } from './locale';
 import type { ModifierGlyphs } from './platform';
 
 export type MenuBarItem =
@@ -31,6 +32,8 @@ export interface MenuBarGroup {
 }
 
 export interface MenuBarBuildOptions {
+	/** Current UI locale — resolves all labels/details through the copy dict. */
+	locale: StudioLocale;
 	/** Platform-correct modifier glyphs (⌘/⇧/⌫ on macOS, Ctrl/Shift/Del elsewhere). */
 	glyphs: ModifierGlyphs;
 	importBlocked: boolean;
@@ -55,36 +58,37 @@ export interface MenuBarBuildOptions {
  */
 export function buildMenuBarGroups(options: MenuBarBuildOptions): MenuBarGroup[] {
 	const { glyphs } = options;
+	const copy = studioCopy(options.locale);
 	return [
 		{
 			id: 'project',
-			label: 'Project',
+			label: copy.project,
 			items: [
-				{ kind: 'item', id: 'import', label: 'Import media…', disabled: options.importBlocked },
+				{ kind: 'item', id: 'import', label: copy.importMediaMenu, disabled: options.importBlocked },
 				{
 					kind: 'item',
 					id: 'convert',
-					label: 'Convert media…',
-					detail: 'Change a file’s format without editing'
+					label: copy.convertMediaMenu,
+					detail: copy.convertMediaDetail
 				},
-				{ kind: 'item', id: 'render-queue', label: 'Render queue' }
+				{ kind: 'item', id: 'render-queue', label: copy.renderQueue }
 			]
 		},
 		{
 			id: 'edit',
-			label: 'Edit',
+			label: copy.edit,
 			items: [
 				{
 					kind: 'item',
 					id: 'undo',
-					label: 'Undo',
+					label: copy.undo,
 					kbd: `${glyphs.mod}+Z`,
 					disabled: !options.canUndo
 				},
 				{
 					kind: 'item',
 					id: 'redo',
-					label: 'Redo',
+					label: copy.redo,
 					kbd: `${glyphs.mod}+${glyphs.shift}+Z`,
 					disabled: !options.canRedo
 				}
@@ -92,19 +96,19 @@ export function buildMenuBarGroups(options: MenuBarBuildOptions): MenuBarGroup[]
 		},
 		{
 			id: 'view',
-			label: 'View',
+			label: copy.view,
 			items: [
 				{
 					kind: 'item',
 					id: 'scopes',
-					label: options.scopesPanelVisible ? 'Hide scopes' : 'Show scopes',
+					label: options.scopesPanelVisible ? copy.hideScopes : copy.showScopes,
 					disabled: !options.scopesPanelAvailable
 				}
 			]
 		},
 		{
 			id: 'clip',
-			label: 'Clip',
+			label: copy.clip,
 			items: [
 				// Real timeline actions (wired to onSplit/onDelete in the component),
 				// disabled when nothing is selected so selecting them never dead-ends in
@@ -113,14 +117,14 @@ export function buildMenuBarGroups(options: MenuBarBuildOptions): MenuBarGroup[]
 				{
 					kind: 'item',
 					id: 'split',
-					label: 'Split at playhead',
+					label: copy.splitAtPlayhead,
 					kbd: 'S',
 					disabled: !options.hasSelection
 				},
 				{
 					kind: 'item',
 					id: 'delete',
-					label: 'Delete selected',
+					label: copy.deleteSelected,
 					kbd: glyphs.del,
 					disabled: !options.hasSelection
 				}
@@ -128,27 +132,29 @@ export function buildMenuBarGroups(options: MenuBarBuildOptions): MenuBarGroup[]
 		},
 		{
 			id: 'timeline',
-			label: 'Timeline',
+			label: copy.timeline,
 			items: [
 				{
 					kind: 'item',
 					id: 'snap',
-					label: options.timelineSnapEnabled ? 'Disable snap' : 'Enable snap'
+					label: options.timelineSnapEnabled ? copy.disableSnap : copy.enableSnap
 				},
 				{
 					kind: 'item',
 					id: 'beat-snap',
-					label: options.timelineSnapToBeats ? 'Disable beat snap' : 'Enable beat snap',
+					label: options.timelineSnapToBeats
+						? copy.disableBeatSnap
+						: copy.enableBeatSnap,
 					disabled: !options.timelineSnapEnabled
 				}
 			]
 		},
 		{
 			id: 'help',
-			label: 'Help',
+			label: copy.help,
 			items: [
-				{ kind: 'item', id: 'user-guide', label: 'User guide' },
-				{ kind: 'item', id: 'capabilities', label: 'Browser capabilities' }
+				{ kind: 'item', id: 'user-guide', label: copy.userGuide },
+				{ kind: 'item', id: 'capabilities', label: copy.browserCapabilities }
 			]
 		}
 	];
@@ -162,6 +168,8 @@ export interface CommandAction {
 }
 
 export interface CommandActionsBuildOptions {
+	/** Current UI locale — resolves all labels/details through the copy dict. */
+	locale: StudioLocale;
 	importHint?: string | null;
 	importBlocked: boolean;
 	playing: boolean;
@@ -199,36 +207,37 @@ export interface CommandActionsBuildOptions {
  * Translate, Smart reframe, and Remove silences are reachable here.
  */
 export function buildCommandActions(options: CommandActionsBuildOptions): CommandAction[] {
+	const copy = studioCopy(options.locale);
 	return [
 		{
-			label: 'Import media',
-			detail: options.importHint ?? 'Add clips, images, or audio',
+			label: copy.importMedia,
+			detail: options.importHint ?? copy.importMediaDetail,
 			disabled: options.importBlocked,
 			onSelect: options.onImport
 		},
 		{
 			// Index 1 stays the play/pause entry (asserted by tests); keep this after it.
-			label: options.playing ? 'Pause transport' : 'Play transport',
-			detail: 'Preview playback',
+			label: options.playing ? copy.pauseTransport : copy.playTransport,
+			detail: copy.previewPlayback,
 			disabled: options.transportDisabled,
 			onSelect: options.onPlayPause
 		},
 		{
-			label: 'Convert media',
-			detail: 'Change a file’s format (no editing)',
+			label: copy.convertMedia,
+			detail: copy.convertMediaCommandDetail,
 			onSelect: options.onConvert
 		},
 		{
-			label: 'Audio Cleanup',
+			label: copy.audioCleanup,
 			detail: options.audioCleanupAvailable
-				? 'Reduce noise on the selected clip'
-				: 'Select an audio clip first',
+				? copy.audioCleanupDetail
+				: copy.selectAudioClipFirst,
 			disabled: !options.audioCleanupAvailable,
 			onSelect: options.onAudioCleanup
 		},
 		{
-			label: 'Auto captions',
-			detail: 'On-device speech recognition',
+			label: copy.autoCaptions,
+			detail: copy.autoCaptionsDetail,
 			onSelect: options.onAutoCaptions
 		},
 		...(options.languageToolsAvailable
@@ -236,58 +245,58 @@ export function buildCommandActions(options: CommandActionsBuildOptions): Comman
 					{
 						// Broader than "Translate" so the Draft titles/hashtags flow in the
 						// same panel stays discoverable — this is its only launcher.
-						label: 'Language Tools',
-						detail: 'Translate captions · draft titles, hashtags & copy on-device',
+						label: copy.languageTools,
+						detail: copy.languageToolsDetail,
 						onSelect: options.onLanguageTools
 					}
 				]
 			: []),
 		{
-			label: 'Smart reframe',
-			detail: 'Generate crop-path keyframes',
+			label: copy.smartReframe,
+			detail: copy.smartReframeDetail,
 			onSelect: options.onSmartReframe
 		},
 		{
-			label: 'Remove silences',
-			detail: 'Find and trim silent gaps',
+			label: copy.removeSilences,
+			detail: copy.removeSilencesDetail,
 			onSelect: options.onSilenceReview
 		},
 		{
-			label: 'Record',
-			detail: 'Open recording controls',
+			label: copy.record,
+			detail: copy.recordDetail,
 			onSelect: options.onOpenRecord
 		},
 		{
-			label: 'Captions',
-			detail: 'Open caption track editor',
+			label: copy.captionsCommand,
+			detail: copy.captionsDetail,
 			onSelect: options.onOpenCaptions
 		},
 		{
-			label: 'View scopes',
+			label: copy.viewScopes,
 			detail: options.scopesPanelAvailable
-				? 'Toggle waveform and vectorscope overlays'
-				: 'Scopes require WebGPU support',
+				? copy.viewScopesDetail
+				: copy.scopesRequireWebGpu,
 			disabled: !options.scopesPanelAvailable,
 			onSelect: options.onToggleScopes
 		},
 		{
-			label: 'Render queue',
-			detail: 'Open the export render queue',
+			label: copy.renderQueue,
+			detail: copy.renderQueueDetail,
 			onSelect: options.onOpenRenderQueue
 		},
 		{
-			label: 'Go live',
-			detail: 'Open WHIP publish controls',
+			label: copy.goLiveCommand,
+			detail: copy.goLiveDetail,
 			onSelect: options.onPublish
 		},
 		{
-			label: 'Browser capabilities',
-			detail: 'Inspect browser pipeline support',
+			label: copy.browserCapabilities,
+			detail: copy.browserCapabilitiesDetail,
 			onSelect: options.onCapabilities
 		},
 		{
-			label: 'User guide',
-			detail: 'Open in-app documentation',
+			label: copy.userGuide,
+			detail: copy.userGuideDetail,
 			onSelect: options.onHelp
 		}
 	];

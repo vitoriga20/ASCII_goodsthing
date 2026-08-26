@@ -12,6 +12,7 @@ import type {
 	GradientStop
 } from '../protocol';
 import { DEFAULT_PADDED_BACKGROUND } from '../engine/padded-background';
+import { studioCopy, studioLocale } from './locale';
 
 interface PaddedBackgroundPanelProps {
 	trackId: string;
@@ -29,6 +30,13 @@ const PARAM_DEBOUNCE_MS = 80;
 
 export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	const copy = () => studioCopy(studioLocale());
+	const bgKindLabel = (kind: PaddedBackgroundKind) =>
+		({
+			solid: copy().solid,
+			gradient: copy().gradient,
+			wallpaper: copy().wallpaper
+		})[kind];
 
 	const enabled = () => props.paddedBackground != null;
 
@@ -78,11 +86,11 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 
 	return (
 		<section class="inspector-section">
-			<h3>Padded Background</h3>
+			<h3>{copy().paddedBackground}</h3>
 
 			<label class="toggle-label">
 				<input type="checkbox" checked={enabled()} onChange={toggle} />
-				Enable
+				{copy().enable}
 			</label>
 
 			<Show when={enabled()}>
@@ -113,7 +121,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 											updateParam('background', bg);
 										}}
 									/>
-									{kind.charAt(0).toUpperCase() + kind.slice(1)}
+									{bgKindLabel(kind)}
 								</label>
 							)}
 						</For>
@@ -121,7 +129,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 
 					<Show when={bgKind() === 'solid'}>
 						<label>
-							Colour
+							{copy().colour}
 							<input
 								type="color"
 								value={(params().background as { kind: 'solid'; color: string }).color}
@@ -174,7 +182,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 							)}
 						</For>
 						<label>
-							Angle
+							{copy().angle}
 							<input
 								type="range"
 								min={0}
@@ -195,7 +203,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 
 					<Show when={bgKind() === 'wallpaper'}>
 						<label>
-							Wallpaper source
+							{copy().wallpaperSource}
 							<select
 								value={(params().background as { kind: 'wallpaper'; sourceId: string }).sourceId}
 								onChange={(e) =>
@@ -205,7 +213,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 									})
 								}
 							>
-								<option value="">Select media...</option>
+								<option value="">{copy().selectMedia}</option>
 								<For each={wallpaperAssets()}>
 									{(asset) => <option value={asset.sourceId}>{asset.fileName}</option>}
 								</For>
@@ -214,7 +222,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 					</Show>
 
 					<label>
-						Inset margin
+						{copy().insetMargin}
 						<input
 							type="range"
 							min={0}
@@ -227,7 +235,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 					</label>
 
 					<label>
-						Corner radius
+						{copy().cornerRadius}
 						<input
 							type="range"
 							min={0}
@@ -240,7 +248,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 					</label>
 
 					<label>
-						Shadow opacity
+						{copy().shadowOpacity}
 						<input
 							type="range"
 							min={0}
@@ -253,7 +261,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 					</label>
 
 					<label>
-						Shadow radius
+						{copy().shadowRadius}
 						<input
 							type="range"
 							min={0}
@@ -266,7 +274,7 @@ export function PaddedBackgroundPanel(props: PaddedBackgroundPanelProps) {
 					</label>
 
 					<label>
-						Shadow offset Y
+						{copy().shadowOffsetY}
 						<input
 							type="range"
 							min={-32}

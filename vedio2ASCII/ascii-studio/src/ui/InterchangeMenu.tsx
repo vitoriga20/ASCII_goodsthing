@@ -48,8 +48,8 @@ export function InterchangeMenu(props: InterchangeMenuProps) {
 				disabled={!props.hasTimeline}
 				title={
 					props.hasTimeline
-						? 'Export the timeline for other editors (.otio / .edl)'
-						: 'Add clips to the timeline to export interchange files'
+						? copy().exportInterchangeTitle
+						: copy().exportInterchangeDisabledTitle
 				}
 			>
 				<FileOutput size={14} aria-hidden="true" />
@@ -59,22 +59,19 @@ export function InterchangeMenu(props: InterchangeMenuProps) {
 				<Popover.Positioner>
 					<Popover.Content
 						class="export-popover bundle-popover panel"
-						aria-label="Timeline interchange"
+						aria-label={copy().timelineInterchange}
 					>
 						<div class="export-popover-header">
-							<h2 class="export-popover-title">Timeline interchange</h2>
-							<p class="export-popover-subtitle">
-								Cuts, markers, and transitions for other editors. Effects and looks stay
-								LocalCut-only metadata.
-							</p>
+							<h2 class="export-popover-title">{copy().timelineInterchange}</h2>
+							<p class="export-popover-subtitle">{copy().interchangeSubtitle}</p>
 						</div>
 						<div class="bundle-actions">
 							<Button variant="default" onClick={() => props.onExport('otio')}>
-								Export Timeline (.otio)
+								{copy().exportOtio}
 							</Button>
 							<Show when={props.videoTracks.length > 1}>
 								<label class="bundle-collect-row">
-									EDL track
+									{copy().edlTrack}
 									<select
 										value={selectedEdlTrack()?.id ?? ''}
 										onChange={(event) => setEdlTrackId(event.currentTarget.value)}
@@ -82,7 +79,11 @@ export function InterchangeMenu(props: InterchangeMenuProps) {
 										<For each={props.videoTracks}>
 											{(track) => (
 												<option value={track.id}>
-													{track.name} ({track.clipCount} clip{track.clipCount === 1 ? '' : 's'})
+													{track.name} (
+													{track.clipCount === 1
+														? copy().clipCountOne.replace('{n}', String(track.clipCount))
+														: copy().clipCountMany.replace('{n}', String(track.clipCount))}
+													)
 												</option>
 											)}
 										</For>
@@ -94,7 +95,7 @@ export function InterchangeMenu(props: InterchangeMenuProps) {
 								disabled={!selectedEdlTrack()}
 								onClick={() => props.onExport('edl', selectedEdlTrack()?.id)}
 							>
-								Export EDL (.edl)
+								{copy().exportEdl}
 							</Button>
 						</div>
 						<Show when={props.lastMessage || props.warnings.length > 0}>

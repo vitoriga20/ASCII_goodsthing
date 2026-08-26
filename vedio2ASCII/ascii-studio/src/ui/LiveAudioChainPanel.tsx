@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js';
 import { AudioInsertRow } from './AudioInsertRow';
 import { RailEmpty } from './RailEmpty';
+import { studioCopy, studioLocale } from './locale';
 import type { LiveAudioChainConfig } from '../protocol';
 
 export interface LiveAudioChainPanelProps {
@@ -46,6 +47,7 @@ function SliderControl(props: {
 }
 
 export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [expanded, setExpanded] = createSignal(props.initiallyExpanded ?? false);
 
 	const cfg = () => props.config;
@@ -59,29 +61,30 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 				aria-expanded={expanded()}
 				aria-controls={expanded() ? 'live-audio-chain-body' : undefined}
 			>
-				<span class="panel-title">Live Audio Chain</span>
-				<span class="latency-display">Latency: {props.latencyMs.toFixed(1)} ms</span>
+				<span class="panel-title">{copy().liveAudioChain}</span>
+				<span class="latency-display">
+					{copy().latencyMs.replace('{x}', props.latencyMs.toFixed(1))}
+				</span>
 			</button>
 
 			<Show when={expanded()}>
 				<div class="collapse-body" id="live-audio-chain-body">
 					<Show when={!props.crossOriginIsolated}>
 						<div class="capability-warning" role="alert">
-							Live Audio Chain requires cross-origin isolation.
+							{copy().chainRequiresIsolation}
 						</div>
 					</Show>
 
 					<Show when={props.crossOriginIsolated && !props.isCapturing}>
-						<RailEmpty compact title="Configure before recording">
-							Gate, compressor, and limiter can be printed to recorded audio. Start a recording to
-							enable that option; live monitoring stays unprocessed.
+						<RailEmpty compact title={copy().configureBeforeRecording}>
+							{copy().chainEmptyNote}
 						</RailEmpty>
 					</Show>
 
 					<Show when={props.crossOriginIsolated}>
 						{/* Gate */}
 						<AudioInsertRow
-							label="Gate"
+							label={copy().gate}
 							bypass={cfg().gate.bypass}
 							onToggleBypass={() =>
 								props.onConfigChange({
@@ -90,7 +93,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 							}
 						>
 							<SliderControl
-								label="Threshold"
+								label={copy().threshold}
 								value={cfg().gate.thresholdDb}
 								min={-80}
 								max={0}
@@ -103,7 +106,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Range"
+								label={copy().range}
 								value={cfg().gate.rangeDb}
 								min={-120}
 								max={0}
@@ -112,7 +115,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								onChange={(v) => props.onConfigChange({ gate: { ...cfg().gate, rangeDb: v } })}
 							/>
 							<SliderControl
-								label="Attack"
+								label={copy().attack}
 								value={cfg().gate.attackMs}
 								min={0.01}
 								max={10}
@@ -121,7 +124,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								onChange={(v) => props.onConfigChange({ gate: { ...cfg().gate, attackMs: v } })}
 							/>
 							<SliderControl
-								label="Hold"
+								label={copy().hold}
 								value={cfg().gate.holdMs}
 								min={0}
 								max={500}
@@ -130,7 +133,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								onChange={(v) => props.onConfigChange({ gate: { ...cfg().gate, holdMs: v } })}
 							/>
 							<SliderControl
-								label="Release"
+								label={copy().release}
 								value={cfg().gate.releaseMs}
 								min={1}
 								max={1000}
@@ -146,7 +149,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 
 						{/* Compressor */}
 						<AudioInsertRow
-							label="Compressor"
+							label={copy().compressor}
 							bypass={cfg().compressor.bypass}
 							onToggleBypass={() =>
 								props.onConfigChange({
@@ -158,7 +161,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 							}
 						>
 							<SliderControl
-								label="Threshold"
+								label={copy().threshold}
 								value={cfg().compressor.thresholdDb}
 								min={-60}
 								max={0}
@@ -171,7 +174,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Ratio"
+								label={copy().ratio}
 								value={cfg().compressor.ratio}
 								min={1}
 								max={20}
@@ -184,7 +187,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Attack"
+								label={copy().attack}
 								value={cfg().compressor.attackMs}
 								min={0.1}
 								max={100}
@@ -197,7 +200,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Release"
+								label={copy().release}
 								value={cfg().compressor.releaseMs}
 								min={10}
 								max={2000}
@@ -210,7 +213,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Knee"
+								label={copy().knee}
 								value={cfg().compressor.kneeDb}
 								min={0}
 								max={24}
@@ -223,7 +226,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Makeup Gain"
+								label={copy().makeupGain}
 								value={cfg().compressor.makeupGainDb}
 								min={-12}
 								max={24}
@@ -239,7 +242,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 
 						{/* Limiter */}
 						<AudioInsertRow
-							label="Limiter"
+							label={copy().limiter}
 							bypass={cfg().limiter.bypass}
 							onToggleBypass={() =>
 								props.onConfigChange({
@@ -248,7 +251,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 							}
 						>
 							<SliderControl
-								label="Ceiling"
+								label={copy().ceiling}
 								value={cfg().limiter.ceilingDb}
 								min={-12}
 								max={0}
@@ -261,7 +264,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Attack"
+								label={copy().attack}
 								value={cfg().limiter.attackUs}
 								min={10}
 								max={10000}
@@ -274,7 +277,7 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 								}
 							/>
 							<SliderControl
-								label="Release"
+								label={copy().release}
 								value={cfg().limiter.releaseMs}
 								min={1}
 								max={500}
@@ -301,12 +304,9 @@ export function LiveAudioChainPanel(props: LiveAudioChainPanelProps) {
 											})
 										}
 									/>
-									Print chain to recording
+									{copy().printToRecording}
 								</label>
-								<p class="print-toggle-hint">
-									Applies the chain to recorded audio in the pipeline worker. Monitor output is
-									unprocessed in this version.
-								</p>
+								<p class="print-toggle-hint">{copy().printToRecordingHint}</p>
 							</div>
 						</Show>
 					</Show>

@@ -591,8 +591,8 @@ export function Timeline(props: TimelineProps) {
 							if (marker) seekTo(marker.time);
 						}}
 						disabled={props.markers().length === 0}
-						aria-label="Previous marker"
-						title="Previous marker"
+						aria-label={copy().previousMarker}
+						title={copy().previousMarker}
 					>
 						<SkipBack size={13} aria-hidden="true" />
 					</button>
@@ -600,11 +600,14 @@ export function Timeline(props: TimelineProps) {
 						type="button"
 						class="timeline-tool-button"
 						onClick={() =>
-							props.onAddMarker(boundedCurrentTime(), `Marker ${props.markers().length + 1}`)
+							props.onAddMarker(
+								boundedCurrentTime(),
+								copy().markerN.replace('{n}', String(props.markers().length + 1))
+							)
 						}
 						disabled={props.duration() <= 0}
-						aria-label="Add marker at playhead"
-						title="Add marker at playhead"
+						aria-label={copy().addMarkerAtPlayhead}
+						title={copy().addMarkerAtPlayhead}
 					>
 						<Flag size={13} aria-hidden="true" />
 					</button>
@@ -616,8 +619,8 @@ export function Timeline(props: TimelineProps) {
 							if (marker) seekTo(marker.time);
 						}}
 						disabled={props.markers().length === 0}
-						aria-label="Next marker"
-						title="Next marker"
+						aria-label={copy().nextMarker}
+						title={copy().nextMarker}
 					>
 						<SkipForward size={13} aria-hidden="true" />
 					</button>
@@ -625,28 +628,30 @@ export function Timeline(props: TimelineProps) {
 						class="timeline-toggle-group"
 						value={timelineModeValues()}
 						multiple
-						aria-label="Timeline snapping modes"
+						aria-label={copy().timelineSnappingModes}
 						onValueChange={setTimelineModeValues}
 					>
 						<ToggleGroup.Item
 							value="snap"
 							class="timeline-tool-button timeline-toggle-item"
-							aria-label="Toggle snapping"
-							title="Toggle snapping"
+							aria-label={copy().toggleSnapping}
+							title={copy().toggleSnapping}
 						>
 							<Magnet size={13} aria-hidden="true" />
-							Snap
+							{copy().snap}
 						</ToggleGroup.Item>
 						<ToggleGroup.Item
 							value="beat"
 							class="timeline-tool-button timeline-toggle-item"
 							disabled={!props.snapEnabled}
-							aria-label="Toggle snap to beats"
+							aria-label={copy().toggleSnapToBeats}
 							title={
-								props.snapEnabled ? 'Toggle snap to beats' : 'Enable snapping before beat snapping'
+								props.snapEnabled
+									? copy().toggleSnapToBeats
+									: copy().enableSnappingBeforeBeatSnapping
 							}
 						>
-							Beat
+							{copy().beat}
 						</ToggleGroup.Item>
 					</ToggleGroup.Root>
 					<button
@@ -654,18 +659,18 @@ export function Timeline(props: TimelineProps) {
 						class="timeline-tool-button"
 						onClick={() => props.onCloseGaps(selectedTrackId())}
 						disabled={props.timeline().length === 0}
-						aria-label="Close gaps"
-						title="Close gaps"
+						aria-label={copy().closeGapsAction}
+						title={copy().closeGapsAction}
 					>
 						<RotateCcw size={13} aria-hidden="true" />
-						Gaps
+						{copy().closeGaps}
 					</button>
 					<button
 						type="button"
 						class="timeline-tool-button"
 						onClick={() => zoomBy(0.8)}
-						aria-label="Zoom out"
-						title={`Zoom out (${glyphs.mod}+-)`}
+						aria-label={copy().zoomOut}
+						title={copy().zoomOutHint.replace('{x}', `${glyphs.mod}+-`)}
 					>
 						<ZoomOut size={13} aria-hidden="true" />
 					</button>
@@ -673,17 +678,14 @@ export function Timeline(props: TimelineProps) {
 						type="button"
 						class="timeline-tool-button"
 						onClick={() => zoomBy(1.25)}
-						aria-label="Zoom in"
-						title={`Zoom in (${glyphs.mod}+=)`}
+						aria-label={copy().zoomIn}
+						title={copy().zoomInHint.replace('{x}', `${glyphs.mod}+=`)}
 					>
 						<ZoomIn size={13} aria-hidden="true" />
 					</button>
 				</div>
 			</div>
-			<Show
-				when={props.hasMedia}
-				fallback={<p class="placeholder-text">{copy().dropHere}</p>}
-			>
+			<Show when={props.hasMedia} fallback={<p class="placeholder-text">{copy().dropHere}</p>}>
 				<div class="timeline-track-wrapper">
 					<div class="timeline-label-column">
 						<For each={props.timeline()}>
@@ -702,7 +704,7 @@ export function Timeline(props: TimelineProps) {
 								/>
 							)}
 						</For>
-						<div class="timeline-ruler-label">Ruler</div>
+						<div class="timeline-ruler-label">{copy().ruler}</div>
 					</div>
 					<div
 						class="timeline-scroll-viewport"
@@ -784,7 +786,10 @@ export function Timeline(props: TimelineProps) {
 														onPointerDown={(e) =>
 															onTransitionPointerDown(e, transition.id, transition.durationS)
 														}
-														aria-label={`${transition.kind} transition between ${transition.fromClipId} and ${transition.toClipId}`}
+														aria-label={copy()
+															.transitionBetween.replace('{x}', transition.kind)
+															.replace('{a}', transition.fromClipId)
+															.replace('{b}', transition.toClipId)}
 													>
 														<Diamond size={12} aria-hidden="true" />
 													</button>
@@ -817,8 +822,8 @@ export function Timeline(props: TimelineProps) {
 												type="button"
 												class="timeline-marker-delete"
 												onClick={() => props.onDeleteMarker(marker.id)}
-												aria-label={`Delete ${marker.label}`}
-												title={`Delete ${marker.label}`}
+												aria-label={`${copy().delete} ${marker.label}`}
+												title={`${copy().delete} ${marker.label}`}
 											>
 												<X size={10} aria-hidden="true" />
 											</button>
@@ -833,8 +838,8 @@ export function Timeline(props: TimelineProps) {
 								onKeyDown={onScrubKeyDown}
 								tabIndex={0}
 								role="slider"
-								aria-roledescription="timeline seek control"
-								aria-label="Timeline"
+								aria-roledescription={copy().timelineSeekControl}
+								aria-label={copy().timeline}
 								aria-valuemin={0}
 								aria-valuemax={props.duration()}
 								aria-valuenow={boundedCurrentTime()}

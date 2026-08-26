@@ -6,7 +6,9 @@ import '../global.css';
 import {
 	CAPTURE_SIDE_RAIL_TABS,
 	SIDE_RAIL_TABS,
+	captureSideRailTabLabel,
 	isSideRailTab,
+	sideRailTabLabel,
 	sideRailTabTriggerId,
 	type CaptureSideRailTab,
 	type SideRailTab
@@ -37,7 +39,7 @@ function renderSideRailTabs(widthPx = 302): HTMLElement {
 					<For each={SIDE_RAIL_TABS}>
 						{(tab) => (
 							<Tabs.Trigger id={sideRailTabTriggerId(tab.id)} value={tab.id} class="side-rail-tab">
-								{tab.label}
+								{sideRailTabLabel(tab.id)}
 							</Tabs.Trigger>
 						)}
 					</For>
@@ -60,25 +62,28 @@ function renderSecondaryCaptureTabs(): HTMLElement {
 	const dispose = render(
 		() => (
 			<div class="side-rail-tab-panel">
-				<SecondaryRailTabs
-					idPrefix="capture"
-					label="Capture tools"
-					tabs={CAPTURE_SIDE_RAIL_TABS}
-					value={value()}
-					onSelect={(tab) => setValue(tab)}
-				/>
-				<For each={CAPTURE_SIDE_RAIL_TABS}>
-					{(tab) => (
-						<SecondaryRailPanel
-							idPrefix="capture"
-							tab={tab.id}
-							value={value()}
-							keepMounted={tab.id !== 'publish'}
-						>
-							<button type="button">Panel {tab.label}</button>
-						</SecondaryRailPanel>
-					)}
-				</For>
+<SecondaryRailTabs
+						idPrefix="capture"
+						label="Capture tools"
+						tabs={CAPTURE_SIDE_RAIL_TABS.map((tab) => ({
+							id: tab.id,
+							label: captureSideRailTabLabel(tab.id)
+						}))}
+						value={value()}
+						onSelect={(tab) => setValue(tab)}
+					/>
+					<For each={CAPTURE_SIDE_RAIL_TABS}>
+						{(tab) => (
+							<SecondaryRailPanel
+								idPrefix="capture"
+								tab={tab.id}
+								value={value()}
+								keepMounted={tab.id !== 'publish'}
+							>
+								<button type="button">Panel {captureSideRailTabLabel(tab.id)}</button>
+							</SecondaryRailPanel>
+						)}
+					</For>
 			</div>
 		),
 		container

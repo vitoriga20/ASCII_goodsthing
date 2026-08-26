@@ -3,6 +3,7 @@ import { clamp } from '../lib/math';
 import { type TimelineClipSnapshot as ProtocolTimelineClip, type WaveformPeaks } from '../protocol';
 import { resolveSnap, timelineTimeAtClientX, type SnapTarget } from './timeline-interaction';
 import type { ThumbnailEntry } from './thumbnail-store';
+import { studioCopy, studioLocale } from './locale';
 import { Waveform } from './Waveform';
 
 interface TimelineClipProps {
@@ -64,6 +65,7 @@ function trackTimeAt(
 
 /** Clip block renderer from mirrored timeline data. */
 export function TimelineClip(props: TimelineClipProps) {
+	const copy = () => studioCopy(studioLocale());
 	// Derived accessors (not one-shot values): a SolidJS component body runs once,
 	// so reading props.* here directly would freeze position/size at first render and
 	// never reflect a move/trim/duration change. Evaluate inside the tracking context.
@@ -334,7 +336,7 @@ export function TimelineClip(props: TimelineClipProps) {
 			title={clipTitle()}
 			role="button"
 			aria-pressed={!!props.selected}
-			aria-label={`${clipTitle()}${props.clip.offline ? ' offline' : ''}`}
+			aria-label={`${clipTitle()}${props.clip.offline ? ` ${copy().offline}` : ''}`}
 			tabindex="0"
 			onKeyDown={onKeyDown}
 			onPointerDown={onPointerDown}
@@ -358,20 +360,20 @@ export function TimelineClip(props: TimelineClipProps) {
 				{props.clip.matte?.enabled ? (
 					<span
 						class="timeline-clip-badge"
-						aria-label="Portrait matte enabled"
-						title="Portrait matte"
+						aria-label={copy().portraitMatteEnabled}
+						title={copy().portraitMatte}
 					>
 						M
 					</span>
 				) : null}
-				<span class="timeline-clip-left-handle" role="separator" aria-label="Trim start" />
-				<span class="timeline-clip-right-handle" role="separator" aria-label="Trim end" />
+				<span class="timeline-clip-left-handle" role="separator" aria-label={copy().trimStart} />
+				<span class="timeline-clip-right-handle" role="separator" aria-label={copy().trimEnd} />
 				{props.clip.duration > 0.2 ? (
 					<button
 						class="timeline-clip-delete"
 						type="button"
 						tabIndex={-1}
-						aria-label={`Delete ${props.clip.id}`}
+						aria-label={copy().deleteX.replace('{x}', props.clip.id)}
 						onPointerDown={(event) => event.stopPropagation()}
 						onClick={(event) => {
 							event.stopPropagation();

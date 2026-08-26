@@ -1,3 +1,4 @@
+import { studioCopy, studioLocale } from './locale';
 import { createSignal, For, Show } from 'solid-js';
 import { X } from 'lucide-solid';
 import type { CleanupAction, CleanupResult, StorageHealthReport } from '../engine/storage-cleanup';
@@ -26,6 +27,7 @@ function pressureClass(pressure: StorageHealthReport['pressure']): string {
 }
 
 export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [results, setResults] = createSignal<CleanupResult[]>([]);
 	const [running, setRunning] = createSignal<string | null>(null);
 	const [persistStatus, setPersistStatus] = createSignal<string | null>(null);
@@ -40,9 +42,7 @@ export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
 
 	async function handleRequestPersist() {
 		const granted = await requestPersistentStorage();
-		setPersistStatus(
-			granted ? 'Persistent storage granted.' : 'Persistent storage request denied.'
-		);
+		setPersistStatus(granted ? copy().persistGranted : copy().persistDenied);
 		props.onRefresh();
 	}
 
@@ -61,9 +61,9 @@ export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
 			>
 				<header class="capability-panel-header">
 					<div>
-						<p class="panel-title" id="storage-cleanup-title">
-							Storage Cleanup
-						</p>
+<p class="panel-title" id="storage-cleanup-title">
+								{copy().storageCleanup}
+							</p>
 						<Show when={props.report}>
 							{(report) => (
 								<p class={`capability-panel-tier ${pressureClass(report().pressure)}`}>
@@ -75,42 +75,42 @@ export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
 							)}
 						</Show>
 					</div>
-					<Button
-						size="icon"
-						variant="ghost"
-						onClick={props.onClose}
-						aria-label="Close storage cleanup"
-						title="Close storage cleanup"
-					>
+<Button
+							size="icon"
+							variant="ghost"
+							onClick={props.onClose}
+							aria-label={copy().closeStorageCleanup}
+							title={copy().closeStorageCleanup}
+						>
 						<X size={16} aria-hidden="true" />
 					</Button>
 				</header>
 
 				<Show
 					when={props.report}
-					fallback={<p class="capability-panel-note">Loading storage report...</p>}
+					fallback={<p class="capability-panel-note">{copy().loadingStorageReport}</p>}
 				>
 					{(report) => (
 						<>
 							<section class="diagnostics-section">
-								<h2>Health</h2>
+								<h2>{copy().health}</h2>
 								<dl class="diagnostics-grid">
 									<div>
-										<dt>IndexedDB</dt>
-										<dd>{report().indexedDbHealthy ? 'healthy' : 'error'}</dd>
+										<dt>{copy().healthIndexedDB}</dt>
+										<dd>{report().indexedDbHealthy ? copy().healthHealthy : copy().healthError}</dd>
 									</div>
 									<div>
-										<dt>OPFS</dt>
-										<dd>{report().opfsAvailable ? 'available' : 'unavailable'}</dd>
+										<dt>{copy().healthOpfs}</dt>
+										<dd>{report().opfsAvailable ? copy().healthAvailable : copy().healthUnavailable}</dd>
 									</div>
 									<div>
-										<dt>Persistent</dt>
+										<dt>{copy().healthPersistent}</dt>
 										<dd>{report().persistentStorage}</dd>
 									</div>
 								</dl>
 								<Show when={report().persistentStorage !== 'granted'}>
 									<Button size="sm" variant="outline" onClick={handleRequestPersist}>
-										Request persistent storage
+										{copy().requestPersistentStorage}
 									</Button>
 								</Show>
 								<Show when={persistStatus()}>
@@ -121,7 +121,7 @@ export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
 							</section>
 
 							<section class="diagnostics-section">
-								<h2>Cleanup Actions</h2>
+								<h2>{copy().cleanupActions}</h2>
 								<ul class="diagnostics-list">
 									<For each={report().availableCleanups}>
 										{(action) => {
@@ -137,18 +137,19 @@ export function StorageCleanupDialog(props: StorageCleanupDialogProps) {
 															disabled={running() !== null}
 															onClick={() => handleCleanup(action)}
 														>
-															{running() === action.target ? 'Cleaning…' : action.label}
+															{running() === action.target ? copy().cleaning : action.label}
 														</Button>
 													</Show>
-													<Show when={result()}>
-														{(r) => (
-															<p class={r().ok ? 'is-ok' : 'is-breach'}>
-																{r().ok
-																	? `Done (freed ${formatBytes(r().freedBytes)})`
-																	: `Error: ${r().error}`}
-															</p>
-														)}
-													</Show>
+<Show when={result()}>
+															{(r) => (
+																<p class={r().ok ? 'is-ok' : 'is-breach'}>
+																	{r().ok
+																		? copy()
+																				.cleanupDoneFreed.replace('{n}', formatBytes(r().freedBytes))
+																		: copy().cleanupError.replace('{x}', r().error ?? '')}
+																</p>
+															)}
+														</Show>
 												</li>
 											);
 										}}

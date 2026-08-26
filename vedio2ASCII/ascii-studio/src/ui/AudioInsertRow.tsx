@@ -1,6 +1,7 @@
 import { createSignal, createUniqueId, Show, type JSX } from 'solid-js';
 import { Power, PowerOff } from 'lucide-solid';
 import { Button } from './components/button';
+import { studioCopy, studioLocale } from './locale';
 
 export interface AudioInsertRowProps {
 	label: string;
@@ -11,10 +12,13 @@ export interface AudioInsertRowProps {
 }
 
 export function AudioInsertRow(props: AudioInsertRowProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [expanded, setExpanded] = createSignal(false);
 	const paramsId = createUniqueId();
 	const bypassActionLabel = () =>
-		props.bypass ? `Enable ${props.label}` : `Bypass ${props.label}`;
+		props.bypass
+			? copy().enableX.replace('{x}', props.label)
+			: copy().bypassX.replace('{x}', props.label);
 
 	return (
 		<div class="insert-row">
@@ -40,7 +44,7 @@ export function AudioInsertRow(props: AudioInsertRowProps) {
 					<Show when={props.icon}>{props.icon}</Show>
 					<span class="insert-name">{props.label}</span>
 					<span class={`insert-status ${props.bypass ? 'bypassed' : 'active'}`}>
-						{props.bypass ? 'Bypassed' : 'Active'}
+						{props.bypass ? copy().bypassed : copy().active}
 					</span>
 				</button>
 			</div>

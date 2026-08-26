@@ -13,6 +13,7 @@ import { Button } from './components/button';
 import type { TranslationControllerState } from './language-tools/translation-controller';
 import type { DraftControllerState } from './language-tools/draft-controller';
 import type { CaptionTrackSnapshot } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 export interface LanguageToolsPanelProps {
 	open: boolean;
@@ -28,9 +29,6 @@ export interface LanguageToolsPanelProps {
 	onOpenGuide?: () => void;
 	onClose: () => void;
 }
-
-const PRIVACY_STATEMENT =
-	"All translation and drafting run on this device through Chrome's built-in AI. Nothing is uploaded. No cloud API.";
 
 function formatDuration(ms: number | null): string {
 	if (ms === null) return '—';
@@ -73,6 +71,7 @@ function createFieldCopier(markCopiedField: (field: string) => void) {
 
 export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) => {
 	let panelRef: HTMLElement | undefined;
+	const copy = () => studioCopy(studioLocale());
 	const [selectedTrackId, setSelectedTrackId] = createSignal<string>('');
 	const [targetLang, setTargetLang] = createSignal<'auto' | 'zh' | 'en'>('auto');
 	const [copiedField, setCopiedField] = createSignal<string | null>(null);
@@ -150,17 +149,17 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 				<header class="capability-panel-header">
 					<div>
 						<p class="panel-title" id="language-tools-panel-title">
-							Language Tools
+							{copy().languageToolsTitle}
 						</p>
-						<p class="capability-panel-tier">{PRIVACY_STATEMENT}</p>
+						<p class="capability-panel-tier">{copy().privacyStatement}</p>
 					</div>
 					<Show when={!embedded()}>
 						<Button
 							size="icon"
 							variant="ghost"
 							onClick={props.onClose}
-							aria-label="Close language tools panel"
-							title="Close language tools panel"
+							aria-label={copy().closeLanguageToolsPanel}
+							title={copy().closeLanguageToolsPanel}
 						>
 							<X size={16} aria-hidden="true" />
 						</Button>
@@ -169,14 +168,14 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 
 				{/* Track picker — shared between sections */}
 				<section class="diagnostics-section">
-					<h2>Source Track</h2>
+					<h2>{copy().sourceTrack}</h2>
 					<select
 						value={selectedTrackId()}
 						onChange={(e) => setSelectedTrackId(e.currentTarget.value)}
-						aria-label="Select caption track"
+						aria-label={copy().selectCaptionTrackAria}
 					>
 						<option value="" disabled>
-							Select a caption track…
+							{copy().selectCaptionTrackPlaceholder}
 						</option>
 						<For each={props.captionTracks}>
 							{(track) => (
@@ -188,9 +187,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 						</For>
 					</select>
 					<Show when={props.captionTracks.length === 0}>
-						<p class="capability-panel-note">
-							No caption tracks available. Import captions or generate auto captions first.
-						</p>
+						<p class="capability-panel-note">{copy().noCaptionTracks}</p>
 					</Show>
 				</section>
 
@@ -199,7 +196,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 					<section class="diagnostics-section">
 						<h2>
 							<Languages size={14} aria-hidden="true" style={{ 'margin-right': '4px' }} />
-							Translate
+							{copy().translate}
 						</h2>
 
 						{/* Target language picker */}
@@ -211,17 +208,17 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 								'margin-bottom': '8px'
 							}}
 						>
-							<label style={{ 'font-size': '0.85em' }}>Target:</label>
+							<label style={{ 'font-size': '0.85em' }}>{copy().targetColon}</label>
 							<select
 								value={targetLang()}
 								onChange={(e) => setTargetLang(e.currentTarget.value as 'auto' | 'zh' | 'en')}
-								aria-label="Target language"
+								aria-label={copy().targetLanguageAria}
 							>
 								<Show when={detectorUsable()}>
-									<option value="auto">Auto-detect</option>
+									<option value="auto">{copy().autoDetect}</option>
 								</Show>
-								<option value="en">English (en)</option>
-								<option value="zh">Chinese (zh)</option>
+								<option value="en">{copy().languageEnglish}</option>
+								<option value="zh">{copy().languageChinese}</option>
 							</select>
 						</div>
 
@@ -237,7 +234,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 									props.onTranslate(id, t === 'auto' ? undefined : t);
 								}}
 							>
-								Translate
+								{copy().translate}
 							</Button>
 							<Show
 								when={
@@ -247,7 +244,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 								}
 							>
 								<Button size="sm" variant="ghost" onClick={props.onCancelTranslate}>
-									Cancel
+									{copy().cancel}
 								</Button>
 							</Show>
 						</div>
@@ -265,7 +262,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 									props.onExportBilingual(sourceTrackId, translatedTrackId);
 								}}
 							>
-								Export bilingual (SRT + VTT)
+								{copy().exportBilingual}
 							</Button>
 						</Show>
 
@@ -279,17 +276,21 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 							>
 								<Show when={translateJob()!.phase === 'detecting'}>
 									<p style={{ 'font-size': '0.85em' }}>
-										Detecting language…{formatPercent(translateJob()!.downloadFraction)}
+										{copy().detectingLanguage}
+										{formatPercent(translateJob()!.downloadFraction)}
 									</p>
 								</Show>
 								<Show when={translateJob()!.phase === 'downloading'}>
 									<p style={{ 'font-size': '0.85em' }}>
-										Downloading model…{formatPercent(translateJob()!.downloadFraction)}
+										{copy().downloadingModel}
+										{formatPercent(translateJob()!.downloadFraction)}
 									</p>
 								</Show>
 								<Show when={translateJob()!.phase === 'translating'}>
 									<p style={{ 'font-size': '0.85em' }}>
-										Translating {translateJob()!.current}/{translateJob()!.total} segments…
+										{copy()
+											.translatingSegments.replace('{n}', String(translateJob()!.current))
+											.replace('{m}', String(translateJob()!.total))}
 									</p>
 									<progress
 										value={translateJob()!.current}
@@ -299,7 +300,10 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 								</Show>
 								<Show when={translateJob()!.phase === 'done'}>
 									<p style={{ 'font-size': '0.85em', color: 'var(--sage)' }}>
-										✓ Translation complete ({formatDuration(translateJob()!.durationMs)})
+										{copy().translationComplete.replace(
+											'{duration}',
+											formatDuration(translateJob()!.durationMs)
+										)}
 									</p>
 								</Show>
 								<Show when={translateJob()!.phase === 'error'}>
@@ -317,7 +321,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 					<section class="diagnostics-section">
 						<h2>
 							<FileText size={14} aria-hidden="true" style={{ 'margin-right': '4px' }} />
-							Draft
+							{copy().draft}
 						</h2>
 
 						<div style={{ display: 'flex', gap: '8px' }}>
@@ -329,7 +333,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 									if (id) props.onGenerateDraft(id);
 								}}
 							>
-								Generate Draft
+								{copy().generateDraft}
 							</Button>
 							<Show
 								when={
@@ -339,7 +343,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 								}
 							>
 								<Button size="sm" variant="ghost" onClick={props.onCancelDraft}>
-									Cancel
+									{copy().cancel}
 								</Button>
 							</Show>
 						</div>
@@ -354,14 +358,15 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 							>
 								<Show when={draftJob()!.phase === 'preparing'}>
 									<p style={{ 'font-size': '0.85em' }}>
-										Preparing model…{formatPercent(draftJob()!.downloadFraction)}
+										{copy().preparingModel}
+										{formatPercent(draftJob()!.downloadFraction)}
 									</p>
 								</Show>
 								<Show when={draftJob()!.phase === 'summarizing'}>
-									<p style={{ 'font-size': '0.85em' }}>Summarizing transcript…</p>
+									<p style={{ 'font-size': '0.85em' }}>{copy().summarizingTranscript}</p>
 								</Show>
 								<Show when={draftJob()!.phase === 'generating'}>
-									<p style={{ 'font-size': '0.85em' }}>Generating drafts…</p>
+									<p style={{ 'font-size': '0.85em' }}>{copy().generatingDrafts}</p>
 									<Show when={draftJob()!.streamedText}>
 										<pre
 											style={{
@@ -401,13 +406,15 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 												'align-items': 'center'
 											}}
 										>
-											<h3 style={{ 'font-size': '0.85em', 'font-weight': '600' }}>Titles</h3>
+											<h3 style={{ 'font-size': '0.85em', 'font-weight': '600' }}>
+												{copy().draftTitles}
+											</h3>
 											<Button
 												size="icon"
 												variant="ghost"
 												onClick={() => copyField(draftJob()!.draft!.titles.join('\n'), 'titles')}
-												aria-label="Copy titles"
-												title="Copy titles"
+												aria-label={copy().copyTitles}
+												title={copy().copyTitles}
 											>
 												<Show when={copiedField() === 'titles'} fallback={<Copy size={14} />}>
 													<Check size={14} />
@@ -434,13 +441,15 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 												'align-items': 'center'
 											}}
 										>
-											<h3 style={{ 'font-size': '0.85em', 'font-weight': '600' }}>Hashtags</h3>
+											<h3 style={{ 'font-size': '0.85em', 'font-weight': '600' }}>
+												{copy().draftHashtags}
+											</h3>
 											<Button
 												size="icon"
 												variant="ghost"
 												onClick={() => copyField(draftJob()!.draft!.hashtags.join(' '), 'hashtags')}
-												aria-label="Copy hashtags"
-												title="Copy hashtags"
+												aria-label={copy().copyHashtags}
+												title={copy().copyHashtags}
 											>
 												<Show when={copiedField() === 'hashtags'} fallback={<Copy size={14} />}>
 													<Check size={14} />
@@ -462,14 +471,14 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 											}}
 										>
 											<h3 style={{ 'font-size': '0.85em', 'font-weight': '600' }}>
-												文案 (Caption)
+												{copy().draftCaption}
 											</h3>
 											<Button
 												size="icon"
 												variant="ghost"
 												onClick={() => copyField(draftJob()!.draft!.caption, 'caption')}
-												aria-label="Copy caption"
-												title="Copy caption"
+												aria-label={copy().copyCaption}
+												title={copy().copyCaption}
 											>
 												<Show when={copiedField() === 'caption'} fallback={<Copy size={14} />}>
 													<Check size={14} />
@@ -483,7 +492,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 								</Show>
 
 								<p style={{ 'font-size': '0.75em', color: 'var(--text-muted)' }}>
-									Completed in {formatDuration(draftJob()!.durationMs)}
+									{copy().completedIn.replace('{duration}', formatDuration(draftJob()!.durationMs))}
 								</p>
 							</div>
 						</Show>
@@ -493,7 +502,7 @@ export const LanguageToolsPanel: Component<LanguageToolsPanelProps> = (props) =>
 				<Show when={props.onOpenGuide}>
 					<footer class="capability-panel-note">
 						<Button size="sm" variant="ghost" onClick={() => props.onOpenGuide?.()}>
-							Learn more
+							{copy().learnMore}
 						</Button>
 					</footer>
 				</Show>

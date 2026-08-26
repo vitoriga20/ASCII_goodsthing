@@ -28,6 +28,7 @@ import type {
 	CaptureSourceStatusSnapshot,
 	CaptureWebcamPipPresetSnapshot
 } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 import { recordingAvailable, selectCaptureMode } from '../engine/capability-probe-v2';
 import { captureUnavailableReasons } from '../engine/capture-reasons';
 import { startCaptureFrameReader, type CaptureFrameReader } from './capture-frame-reader';
@@ -44,6 +45,8 @@ import { RecorderControlStrip, type RecorderStripSession } from './RecorderContr
 import CaptureWriterWorker from '../engine/capture/writer-worker.ts?worker';
 
 type CaptureStatusState = 'idle' | 'armed' | 'recording' | 'paused' | 'stopping';
+
+type Copy = ReturnType<typeof studioCopy>;
 
 export interface RecorderStatusSnapshot {
 	state: CaptureStatusState;
@@ -173,16 +176,50 @@ function monitorTileStyle(preset: WebcamPipPreset): string {
 	return `width: ${width}%; ${horizontal} ${vertical}`;
 }
 
-function sourceKindLabel(kind: CaptureSourceKind): string {
+function sourceKindLabel(kind: CaptureSourceKind, copy: Copy): string {
 	switch (kind) {
 		case 'screen':
-			return 'screen';
+			return copy.sourceKindScreen;
 		case 'webcam':
-			return 'camera';
+			return copy.sourceKindCamera;
 		case 'mic':
-			return 'microphone';
+			return copy.sourceKindMicrophone;
 		case 'system-audio':
-			return 'tab/system audio';
+			return copy.sourceKindTabSystemAudio;
+	}
+}
+
+function recorderStateLabel(state: CaptureStatusState | 'countdown', copy: Copy): string {
+	switch (state) {
+		case 'idle':
+			return copy.stateIdle;
+		case 'armed':
+			return copy.stateArmed;
+		case 'recording':
+			return copy.stateRecording;
+		case 'paused':
+			return copy.statePaused;
+		case 'stopping':
+			return copy.stateStopping;
+		case 'countdown':
+			return copy.stateCountdown;
+	}
+}
+
+function sourceStateLabel(state: string, copy: Copy): string {
+	switch (state) {
+		case 'ready':
+			return copy.sourceStateReady;
+		case 'capturing':
+			return copy.sourceStateCapturing;
+		case 'stopping':
+			return copy.sourceStateStopping;
+		case 'ended':
+			return copy.sourceStateEnded;
+		case 'error':
+			return copy.sourceStateError;
+		default:
+			return state;
 	}
 }
 
@@ -198,6 +235,8 @@ export function RecordPanel(props: RecordPanelProps) {
 	const [accumulatedPausedUs, setAccumulatedPausedUs] = createSignal(0);
 	const [pausedStartedAtMs, setPausedStartedAtMs] = createSignal<number | null>(null);
 	const [pauseTicker, setPauseTicker] = createSignal(0);
+
+	const copy = () => studioCopy(studioLocale());
 
 	let countdownTimer: ReturnType<typeof setInterval> | null = null;
 	let pauseTimer: ReturnType<typeof setInterval> | null = null;
@@ -322,7 +361,7 @@ export function RecordPanel(props: RecordPanelProps) {
 		autoRetakeStartedFor = null;
 		if (retakeId) {
 			untrack(resetLocalSources);
-			setMessage('Retake armed. Add matching fresh sources to start.');
+			setMessage(copy().retakeArmedAddSources);
 		}
 	});
 
@@ -393,7 +432,7 @@ export function RecordPanel(props: RecordPanelProps) {
 
 	async function addScreen(): Promise<void> {
 		if (!navigator.mediaDevices?.getDisplayMedia) {
-			setMessage('Display capture is unavailable in this browser.');
+			setMessage(copy().displayCaptureUnavailable);
 			return;
 		}
 		const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -403,7 +442,7 @@ export function RecordPanel(props: RecordPanelProps) {
 		const videoTrack = stream.getVideoTracks()[0];
 		if (videoTrack) {
 			addLocalSource(
-				descriptorForTrack('screen', videoTrack.label || 'Screen', videoTrack),
+				descriptorForTrack('screen', videoTrack.label || copy().deviceScreen, videoTrack),
 				videoTrack,
 				stream
 			);
@@ -411,7 +450,7 @@ export function RecordPanel(props: RecordPanelProps) {
 		const audioTrack = stream.getAudioTracks()[0];
 		if (audioTrack) {
 			addLocalSource(
-				descriptorForTrack('system-audio', audioTrack.label || 'Tab audio', audioTrack),
+				descriptorForTrack('system-audio', audioTrack.label || copy().deviceTabAudio, audioTrack),
 				audioTrack,
 				stream
 			);
@@ -422,14 +461,22 @@ export function RecordPanel(props: RecordPanelProps) {
 		const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 		const track = stream.getVideoTracks()[0];
 		if (!track) throw new Error('No camera video track was returned.');
-		addLocalSource(descriptorForTrack('webcam', track.label || 'Camera', track), track, stream);
+		addLocalSource(
+			descriptorForTrack('webcam', track.label || copy().deviceCamera, track),
+			track,
+			stream
+		);
 	}
 
 	async function addMic(): Promise<void> {
 		const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
 		const track = stream.getAudioTracks()[0];
 		if (!track) throw new Error('No microphone audio track was returned.');
-		addLocalSource(descriptorForTrack('mic', track.label || 'Microphone', track), track, stream);
+		addLocalSource(
+			descriptorForTrack('mic', track.label || copy().deviceMicrophone, track),
+			track,
+			stream
+		);
 	}
 
 	function addLocalSource(
@@ -477,7 +524,10 @@ export function RecordPanel(props: RecordPanelProps) {
 				(frame) => pushFrame(sourceId, frame),
 				(error) =>
 					setMessage(
-						`Capture frame reader stopped: ${error instanceof Error ? error.message : String(error)}`
+						copy().frameReaderStopped.replace(
+							'{error}',
+							error instanceof Error ? error.message : String(error)
+						)
 					),
 				() => {
 					// Track ended on its own (the user stopped sharing). Drop our reader
@@ -625,7 +675,7 @@ export function RecordPanel(props: RecordPanelProps) {
 		if (!source) return;
 		clearRegionPick();
 		setRegionPickMode(mode);
-		setMessage(mode === 'crop' ? 'Click an element to crop to.' : 'Click an element to isolate.');
+		setMessage(mode === 'crop' ? copy().clickElementToCrop : copy().clickElementToIsolate);
 		const clickHandler = async (event: MouseEvent) => {
 			event.preventDefault();
 			event.stopPropagation();
@@ -634,18 +684,18 @@ export function RecordPanel(props: RecordPanelProps) {
 			const element = event.target instanceof Element ? event.target : null;
 			const api = regionApi(mode === 'crop' ? 'CropTarget' : 'RestrictionTarget');
 			try {
-				if (!element || !api) throw new Error('Region capture API unavailable.');
+				if (!element || !api) throw new Error(copy().regionApiUnavailable);
 				const target = await api.fromElement(element);
 				const track = source.track as RegionTrack;
 				if (mode === 'crop') {
-					if (!track.cropTo) throw new Error('cropTo is unavailable on this track.');
+					if (!track.cropTo) throw new Error(copy().cropToUnavailable);
 					await track.cropTo(target);
 				} else {
-					if (!track.restrictTo) throw new Error('restrictTo is unavailable on this track.');
+					if (!track.restrictTo) throw new Error(copy().restrictToUnavailable);
 					await track.restrictTo(target);
 				}
 				props.onApplyRegion(source.descriptor.sourceId, mode);
-				setMessage(mode === 'crop' ? 'Region capture applied.' : 'Element capture applied.');
+				setMessage(mode === 'crop' ? copy().regionCaptureApplied : copy().elementCaptureApplied);
 			} catch (error) {
 				setMessage(error instanceof Error ? error.message : String(error));
 			} finally {
@@ -668,28 +718,34 @@ export function RecordPanel(props: RecordPanelProps) {
 		<section class="record-panel" aria-labelledby="record-panel-title">
 			<div class="panel-heading-row">
 				<h2 id="record-panel-title" class="panel-title">
-					Record
+					{copy().recordPanelTitle}
 				</h2>
 				<Show when={props.retakeClipId}>
-					<span class="record-retake-badge">Retake</span>
+					<span class="record-retake-badge">{copy().retakeBadge}</span>
 				</Show>
 			</div>
 			<div class="record-live-region" aria-live="polite">
 				{sessionState() === 'countdown'
-					? `Recording starts in ${countdownRemaining()}`
-					: `Recorder ${sessionState()}`}
+					? copy().recordingStartsIn.replace('{n}', String(countdownRemaining()))
+					: copy()
+							.recorderState.replace('{state}', recorderStateLabel(sessionState(), copy()))}
 			</div>
 
 			<Show when={props.retakeClipId}>
 				<div class="record-retake-note">
-					<strong>Retake armed</strong>
+					<strong>{copy().retakeArmed}</strong>
 					<Show
 						when={missingRetakeSourceKinds().length > 0}
-						fallback={<span>Fresh retake sources are ready. Countdown will start now.</span>}
+						fallback={<span>{copy().retakeSourcesReady}</span>}
 					>
 						<span>
-							Add {missingRetakeSourceKinds().map(sourceKindLabel).join(', ')} to match the original
-							recording.
+							{copy()
+								.addSourcesToMatchOriginal.replace(
+									'{sources}',
+									missingRetakeSourceKinds()
+										.map((kind) => sourceKindLabel(kind, copy()))
+										.join(', ')
+								)}
 						</span>
 					</Show>
 				</div>
@@ -700,13 +756,13 @@ export function RecordPanel(props: RecordPanelProps) {
 					when={props.probe}
 					fallback={
 						<div class="record-disabled-note">
-							<p>Checking browser capabilities…</p>
+							<p>{copy().checkingCapabilities}</p>
 						</div>
 					}
 				>
 					{(probe) => (
 						<CaptureUnavailableNotice
-							subject="Recording"
+							subject={copy().subjectRecording}
 							// Transferable MediaStreamTrack is not required for recording — the
 							// main-frames fallback covers it — so it is never a blocking reason here.
 							reasons={captureUnavailableReasons(probe(), { requireTransferableTrack: false })}
@@ -718,28 +774,27 @@ export function RecordPanel(props: RecordPanelProps) {
 			<Show when={canRecord() && captureMode() === 'main-frames'}>
 				<div class="record-compat-note" role="note">
 					<p>
-						<strong>Compatibility recording mode.</strong> Transferable MediaStreamTrack is
-						unavailable, so frames are read on the main thread and forwarded to the encoder.
-						Recording works; for best performance enable{' '}
-						<code>chrome://flags/#enable-experimental-web-platform-features</code> and reload.
+						<strong>{copy().compatModeTitle}</strong> {copy().compatModeBody}{' '}
+						<code>chrome://flags/#enable-experimental-web-platform-features</code>
+						{copy().compatModeTrailer}
 					</p>
 				</div>
 			</Show>
 
 			<div class="record-section">
-				<h3>Sources</h3>
+				<h3>{copy().sourcesLabel}</h3>
 				<div class="record-source-actions">
 					<button type="button" onClick={() => void addScreen()} disabled={!canRecord()}>
 						<MonitorUp size={16} aria-hidden="true" />
-						Add screen
+						{copy().addScreen}
 					</button>
 					<button type="button" onClick={() => void addCamera()} disabled={!canRecord()}>
 						<Camera size={16} aria-hidden="true" />
-						Camera
+						{copy().camera}
 					</button>
 					<button type="button" onClick={() => void addMic()} disabled={!canRecord()}>
 						<Mic size={16} aria-hidden="true" />
-						Mic
+						{copy().mic}
 					</button>
 				</div>
 				<label class="record-checkbox">
@@ -748,7 +803,7 @@ export function RecordPanel(props: RecordPanelProps) {
 						checked={includeSystemAudio()}
 						onChange={(event) => setIncludeSystemAudio(event.currentTarget.checked)}
 					/>
-					Tab/system audio with screen
+					{copy().tabSystemAudioWithScreen}
 				</label>
 				<div class="record-source-list">
 					<For
@@ -774,7 +829,7 @@ export function RecordPanel(props: RecordPanelProps) {
 							<div class="record-source-chip">
 								<span>{source.label}</span>
 								<small>
-									{source.kind} · {source.state}
+									{sourceKindLabel(source.kind, copy())} · {sourceStateLabel(source.state, copy())}
 								</small>
 							</div>
 						)}
@@ -783,8 +838,8 @@ export function RecordPanel(props: RecordPanelProps) {
 			</div>
 
 			<div class="record-section">
-				<h3>Countdown</h3>
-				<div class="record-segmented" role="radiogroup" aria-label="Countdown duration">
+				<h3>{copy().countdown}</h3>
+				<div class="record-segmented" role="radiogroup" aria-label={copy().countdownDuration}>
 					<For each={[0, 3, 5] as const}>
 						{(value) => (
 							<label>
@@ -803,11 +858,11 @@ export function RecordPanel(props: RecordPanelProps) {
 
 			<Show when={hasWebcam()}>
 				<div class="record-section">
-					<h3>Webcam Layout</h3>
+					<h3>{copy().webcamLayout}</h3>
 					<div class="record-layout-preview">
 						<div class="record-layout-tile" style={monitorTileStyle(settings().webcamPreset)} />
 					</div>
-					<div class="record-corner-grid" aria-label="Webcam corner">
+					<div class="record-corner-grid" aria-label={copy().webcamCorner}>
 						<For
 							each={
 								[
@@ -821,7 +876,7 @@ export function RecordPanel(props: RecordPanelProps) {
 							{([corner, label]) => (
 								<button
 									type="button"
-									aria-label={`Webcam ${corner}`}
+									aria-label={copy().webcamCornerAria.replace('{corner}', corner)}
 									aria-pressed={settings().webcamPreset.corner === corner}
 									onClick={() => updateWebcamPreset({ corner })}
 								>
@@ -830,7 +885,7 @@ export function RecordPanel(props: RecordPanelProps) {
 							)}
 						</For>
 					</div>
-					<div class="record-segmented" role="radiogroup" aria-label="Webcam size">
+					<div class="record-segmented" role="radiogroup" aria-label={copy().webcamSize}>
 						<For each={['S', 'M', 'L'] as const}>
 							{(size) => (
 								<label>
@@ -846,7 +901,7 @@ export function RecordPanel(props: RecordPanelProps) {
 						</For>
 					</div>
 					<label class="record-number-row">
-						Margin
+						{copy().webcamMargin}
 						<input
 							type="number"
 							min="0"
@@ -862,17 +917,17 @@ export function RecordPanel(props: RecordPanelProps) {
 			</Show>
 
 			<div class="record-section">
-				<h3>Experimental</h3>
+				<h3>{copy().experimentalSection}</h3>
 				<div class="record-source-actions">
 					<Show when={props.probe?.captureUx?.cropTarget === 'supported'}>
 						<button
 							type="button"
 							onClick={() => void applyRegion('crop')}
 							disabled={!ownTabSource() || regionPickMode() !== null}
-							title={ownTabSource() ? undefined : 'Add a Tab source first'}
+							title={ownTabSource() ? undefined : copy().addTabSourceFirst}
 						>
 							<Crop size={16} aria-hidden="true" />
-							Own tab (Region)
+							{copy().ownTabRegion}
 						</button>
 					</Show>
 					<Show when={props.probe?.captureUx?.elementCapture === 'supported'}>
@@ -880,10 +935,10 @@ export function RecordPanel(props: RecordPanelProps) {
 							type="button"
 							onClick={() => void applyRegion('element')}
 							disabled={!ownTabSource() || regionPickMode() !== null}
-							title={ownTabSource() ? undefined : 'Add a Tab source first'}
+							title={ownTabSource() ? undefined : copy().addTabSourceFirst}
 						>
 							<MousePointerClick size={16} aria-hidden="true" />
-							Own tab (Element)
+							{copy().ownTabElement}
 						</button>
 					</Show>
 				</div>
@@ -900,13 +955,13 @@ export function RecordPanel(props: RecordPanelProps) {
 							<Show when={sessionState() === 'recording'}>
 								<button type="button" onClick={props.onPause}>
 									<Pause size={16} aria-hidden="true" />
-									Pause
+									{copy().pause}
 								</button>
 							</Show>
 							<Show when={sessionState() === 'paused'}>
 								<button type="button" onClick={props.onResume}>
 									<Play size={16} aria-hidden="true" />
-									Resume
+									{copy().resumeRecordingButton}
 								</button>
 							</Show>
 							<button
@@ -915,7 +970,7 @@ export function RecordPanel(props: RecordPanelProps) {
 								disabled={sessionState() === 'stopping'}
 							>
 								<Square size={16} aria-hidden="true" />
-								Stop
+								{copy().stop}
 							</button>
 						</>
 					}
@@ -924,11 +979,11 @@ export function RecordPanel(props: RecordPanelProps) {
 						<Show when={props.retakeClipId} fallback={<Play size={16} aria-hidden="true" />}>
 							<RotateCcw size={16} aria-hidden="true" />
 						</Show>
-						{props.retakeClipId ? 'Start retake' : 'Start'}
+						{props.retakeClipId ? copy().startRetake : copy().start}
 					</button>
 					<Show when={countdownRemaining() !== null}>
 						<button type="button" onClick={clearCountdown}>
-							Cancel
+							{copy().cancel}
 						</button>
 					</Show>
 				</Show>
@@ -940,7 +995,7 @@ export function RecordPanel(props: RecordPanelProps) {
 						{countdownRemaining()}
 					</div>
 					<button type="button" onClick={clearCountdown}>
-						Cancel
+						{copy().cancel}
 					</button>
 				</div>
 			</Show>

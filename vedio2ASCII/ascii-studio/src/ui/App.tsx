@@ -86,6 +86,11 @@ import { DEFAULT_ASCII_EFFECT, type AsciiEffectParams } from '../engine/ascii-ef
 import { setStudioLocale, studioCopy, studioLocale, type StudioLocale } from './locale';
 import { PreviewGizmo } from './PreviewGizmo';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
+import { StorageCleanupDialog } from './StorageCleanupDialog';
+import {
+	buildStorageHealthReport,
+	type StorageHealthReport
+} from '../engine/storage-cleanup';
 import { buildUiDiagnosticSnapshot } from './diagnostic-snapshot';
 import { Toolbar } from './Toolbar';
 import {
@@ -93,10 +98,13 @@ import {
 	CAPTURE_SIDE_RAIL_TABS,
 	SIDE_RAIL_TABS,
 	SIDE_RAIL_COLLAPSED_KEY,
+	audioSideRailTabLabel,
+	captureSideRailTabLabel,
 	isSideRailTab,
 	migrateLegacySideRailTab,
 	sideRailTabPanelId,
 	sideRailTabTriggerId,
+	textSideRailTabLabel,
 	visibleTextSideRailTabs,
 	sideRailTabLabel,
 	type AudioSideRailTab,
@@ -365,15 +373,16 @@ async function saveTextFile(fileName: string, mimeType: string, content: string)
 
 function capabilityTierV2Label(probe: CapabilityProbeResult | null): string | null {
 	if (!probe) return null;
+	const copy = studioCopy(studioLocale());
 	switch (probe.tier) {
 		case 'core-webgpu':
-			return 'Core WebGPU';
+			return copy.tierCoreWebgpu;
 		case 'compatibility-webgpu':
-			return probe.compatibilityAdapter ? 'GPU (compat)' : 'Compatibility GPU';
+			return probe.compatibilityAdapter ? copy.tierGpuCompat : copy.tierCompatibilityGpu;
 		case 'limited-webcodecs':
-			return 'Limited WebCodecs';
+			return copy.tierLimitedWebCodecs;
 		case 'shell-only':
-			return 'Shell Only';
+			return copy.tierShellOnly;
 	}
 }
 
@@ -472,6 +481,8 @@ export function App() {
 		);
 	};
 	const [diagnosticsPanelOpen, setDiagnosticsPanelOpen] = createSignal(false);
+	const [storageDialogOpen, setStorageDialogOpen] = createSignal(false);
+	const [storageReport, setStorageReport] = createSignal<StorageHealthReport | null>(null);
 	const [audioCleanupOpen, setAudioCleanupOpen] = createSignal(false);
 	const [asrPanelOpen, setAsrPanelOpen] = createSignal(false);
 	const [smartReframeOpen, setSmartReframeOpen] = createSignal(false);
@@ -483,7 +494,7 @@ export function App() {
 		createSignal<CompatibilityPreviewState | null>(null);
 	const [metadata, setMetadata] = createSignal<MediaMetadata | null>(null);
 	const [importing, setImporting] = createSignal(false);
-	const [statusLine, setStatusLine] = createSignal('Checking client capabilities…');
+	const [statusLine, setStatusLine] = createSignal(studioCopy(studioLocale()).checkingClientCapabilities);
 	const [previewLabel, setPreviewLabel] = createSignal<string | null>(null);
 	const [previewSize, setPreviewSize] = createSignal<{
 		width: number;
@@ -605,15 +616,16 @@ export function App() {
 		});
 	});
 	function aspectLabel(aspect: import('../protocol').ProjectAspect): string {
+		const copy = studioText();
 		switch (aspect) {
 			case '16:9':
-				return 'Landscape';
+				return copy.aspectLandscape;
 			case '9:16':
-				return 'Vertical';
+				return copy.aspectVertical;
 			case '1:1':
-				return 'Square';
+				return copy.aspectSquare;
 			case '4:5':
-				return 'Portrait';
+				return copy.aspectPortrait;
 		}
 	}
 	const [calloutToolActive, setCalloutToolActive] = createSignal(false);
@@ -632,7 +644,7 @@ export function App() {
 				if (clip.kind !== 'title' || !clip.title) continue;
 				options.push({
 					id: clip.id,
-					label: clip.title.text.trim() || 'Untitled title'
+					label: clip.title.text.trim() || studioText().untitledTitle
 				});
 			}
 		}
@@ -925,7 +937,7 @@ export function App() {
 			return;
 		}
 		if (!livePreviewFile || !bridge) {
-			setStatusLine('Import a video before enabling real-time rendering.');
+			setStatusLine(studioText().livePreviewNeedsMedia);
 			return;
 		}
 		try {
@@ -1177,11 +1189,11 @@ export function App() {
 	const cleanupController = new CleanupController({
 		spawnWorker: spawnCleanupWorker,
 		requestClipAudio: (request) => {
-			if (!bridge) throw new Error('Media pipeline is not ready.');
+			if (!bridge) throw new Error(studioText().mediaPipelineNotReady);
 			bridge.send({ type: 'extract-clip-audio', ...request });
 		},
 		applyToClip: (request) => {
-			if (!bridge) throw new Error('Media pipeline is not ready.');
+			if (!bridge) throw new Error(studioText().mediaPipelineNotReady);
 			const file = new File([request.wav], request.fileName, {
 				type: 'audio/wav'
 			});
@@ -1261,11 +1273,11 @@ export function App() {
 	const asrController = new AsrController({
 		spawnWorker: spawnAsrWorker,
 		requestClipAudio: (request) => {
-			if (!bridge) throw new Error('Media pipeline is not ready.');
+			if (!bridge) throw new Error(studioText().mediaPipelineNotReady);
 			bridge.send({ type: 'extract-clip-audio', ...request });
 		},
 		createCaptionTrack: (request) => {
-			if (!bridge) throw new Error('Media pipeline is not ready.');
+			if (!bridge) throw new Error(studioText().mediaPipelineNotReady);
 			bridge.send({
 				type: 'asr-create-caption-track',
 				...request
@@ -1291,7 +1303,7 @@ export function App() {
 	// ── Phase 40: On-Device Language Tools ──
 	const translationController = new TranslationController({
 		createTranslatedTrack: (request) => {
-			if (!bridge) throw new Error('Media pipeline is not ready.');
+			if (!bridge) throw new Error(studioText().mediaPipelineNotReady);
 			bridge.send({
 				type: 'add-translated-caption-track',
 				sourceTrackId: request.sourceTrackId,
@@ -1305,8 +1317,8 @@ export function App() {
 			const track = captionTracks().find((t) => t.id === trackId);
 			setStatusLine(
 				track
-					? `Translated caption track "${track.name}" created`
-					: 'Translated caption track created'
+					? studioText().translatedTrackCreatedNamed.replace('{name}', track.name)
+					: studioText().translatedTrackCreated
 			);
 		},
 		onError: (message) => {
@@ -1382,7 +1394,7 @@ export function App() {
 				}
 			});
 		}
-		setStatusLine('Exporting bilingual captions…');
+		setStatusLine(studioText().exportingBilingualCaptions);
 	}
 
 	const selectedAsrClip = createMemo<AsrClipTarget | null>(() => {
@@ -1459,12 +1471,12 @@ export function App() {
 	}
 
 	function requestSourceFile(sourceId: string): Promise<File> {
-		if (!bridge) return Promise.reject(new Error('Media pipeline is not ready.'));
+		if (!bridge) return Promise.reject(new Error(studioText().mediaPipelineNotReady));
 		const requestId = `reframe-src-${sourceFileRequestSeq++}`;
 		return new Promise<File>((resolve, reject) => {
 			const timer = setTimeout(() => {
 				settleSourceFile(requestId, (pending) =>
-					pending.reject(new Error('Timed out resolving the source media for Smart Reframe.'))
+					pending.reject(new Error(studioText().reframeSourceTimeout))
 				);
 			}, SOURCE_FILE_TIMEOUT_MS);
 			pendingSourceFileRequests.set(requestId, { resolve, reject, timer });
@@ -1587,7 +1599,7 @@ export function App() {
 			fit: 'fill'
 		});
 		reframeController.discard();
-		setStatusLine('Smart Reframe keyframes applied');
+		setStatusLine(studioText().smartReframeKeyframesApplied);
 	}
 
 	function findTimelineClip(ref: TimelineClipReference): TimelineClipSnapshot | null {
@@ -1785,17 +1797,18 @@ export function App() {
 	const previewSurfaceAvailable = () => previewReady();
 	const exportSurfaceAvailable = () => exportReady();
 	const pipelineLabel = createMemo(() => {
+		const copy = studioText();
 		switch (previewBackend()) {
 			case 'core-webgpu':
-				return 'Accelerated';
+				return copy.accelerated;
 			case 'compat-webgpu':
-				return 'GPU compat';
+				return copy.gpuCompat;
 			case 'canvas2d':
-				return 'Limited WebCodecs';
+				return copy.tierLimitedWebCodecs;
 			case 'none':
-				if (pipelineMode() === 'starting') return 'Starting pipeline';
-				if (pipelineMode() === 'blocked') return 'Blocked';
-				return capabilityProbeV2()?.tier === 'shell-only' ? 'Shell only' : 'Limited shell';
+				if (pipelineMode() === 'starting') return copy.startingPipeline;
+				if (pipelineMode() === 'blocked') return copy.pipelineBlocked;
+				return capabilityProbeV2()?.tier === 'shell-only' ? copy.shellOnly : copy.limitedShell;
 		}
 	});
 	const compatibilityImportEnabled = () =>
@@ -1816,9 +1829,9 @@ export function App() {
 					runtimeIssue: runtimeIssue()
 				})
 			: pipelineMode() === 'limited' && previewSurfaceAvailable()
-				? 'Loads media into the reduced client-side preview/export path.'
+				? studioText().importHintReduced
 				: compatibilityImportEnabled()
-					? 'Loads a reduced compatibility thumbnail for inspection.'
+					? studioText().importHintCompatThumbnail
 					: null;
 	const limitedIssue = () =>
 		primaryLimitedIssue(capabilities(), {
@@ -1834,16 +1847,17 @@ export function App() {
 		typeof navigator !== 'undefined' &&
 		typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 	const replayCaptureUnsupportedReason = () => {
+		const copy = studioText();
 		if (!probeMediaStreamTrackProcessor()) {
-			return 'Replay Buffer requires MediaStreamTrackProcessor (a recent Chromium browser).';
+			return copy.replayUnsupportedMSTP;
 		}
 		if (
 			typeof navigator === 'undefined' ||
 			typeof navigator.mediaDevices?.getDisplayMedia !== 'function'
 		) {
-			return 'Replay Buffer requires screen capture (getDisplayMedia) in a secure context.';
+			return copy.replayUnsupportedDisplayMedia;
 		}
-		if (!workerReady()) return 'Replay Buffer is unavailable until the pipeline worker is ready.';
+		if (!workerReady()) return copy.replayUnsupportedWorker;
 		return null;
 	};
 	const diagnosticSources = createMemo<DiagnosticSourceInput[]>(() => [
@@ -1921,6 +1935,15 @@ export function App() {
 			const requestId = `diag-${generateId()}`;
 			bridge.send({ type: 'request-diagnostic-snapshot', requestId });
 		}
+	}
+
+	function openStorageCleanup() {
+		setStorageDialogOpen(true);
+		void refreshStorageReport();
+	}
+
+	async function refreshStorageReport() {
+		setStorageReport(await buildStorageHealthReport().catch(() => null));
 	}
 
 	// The user guide is a history-backed view layered over the editor; the
@@ -2051,7 +2074,7 @@ export function App() {
 				isAbortError(error) || (error instanceof DOMException && error.name === 'NotAllowedError');
 			if (!dismissed) {
 				const message = error instanceof Error ? error.message : String(error);
-				setStatusLine(`Capture failed: ${message}`);
+				setStatusLine(studioText().captureFailed.replace('{message}', message));
 			}
 		}
 	}
@@ -2128,7 +2151,7 @@ export function App() {
 				return [
 					{
 						id: makeProgramId('scene'),
-						name: 'Scene 1',
+						name: studioText().programSceneName.replace('{n}', '1'),
 						hotkey: '1',
 						layers: [programLayerForSource(source, 0)]
 					}
@@ -2221,7 +2244,7 @@ export function App() {
 				audio: false
 			});
 			const track = stream.getVideoTracks()[0];
-			if (!track) throw new Error('Screen picker returned no video track.');
+			if (!track) throw new Error(studioText().screenPickerNoTrack);
 			const sourceId = makeProgramId('screen');
 			const monitorTrack = track.clone();
 			monitorTrack.addEventListener('ended', () => removeProgramSource(sourceId), { once: true });
@@ -2229,7 +2252,7 @@ export function App() {
 				{
 					sourceId,
 					kind: 'screen',
-					label: track.label || 'Screen',
+					label: track.label || studioText().programScreenDefault,
 					track,
 					encoderConfig: videoConfigForTrack(track)
 				},
@@ -2254,7 +2277,7 @@ export function App() {
 				audio: false
 			});
 			const track = stream.getVideoTracks()[0];
-			if (!track) throw new Error('Camera capture returned no video track.');
+			if (!track) throw new Error(studioText().cameraNoVideoTrack);
 			const sourceId = makeProgramId('camera');
 			const monitorTrack = track.clone();
 			monitorTrack.addEventListener('ended', () => removeProgramSource(sourceId), { once: true });
@@ -2262,7 +2285,7 @@ export function App() {
 				{
 					sourceId,
 					kind: 'webcam',
-					label: track.label || 'Camera',
+					label: track.label || studioText().programCameraDefault,
 					track,
 					encoderConfig: videoConfigForTrack(track)
 				},
@@ -2287,7 +2310,7 @@ export function App() {
 				video: false
 			});
 			const track = stream.getAudioTracks()[0];
-			if (!track) throw new Error('Microphone capture returned no audio track.');
+			if (!track) throw new Error(studioText().micNoAudioTrack);
 			const sourceId = makeProgramId('mic');
 			const monitorTrack = track.clone();
 			monitorTrack.addEventListener('ended', () => removeProgramSource(sourceId), { once: true });
@@ -2295,7 +2318,7 @@ export function App() {
 				{
 					sourceId,
 					kind: 'mic',
-					label: track.label || 'Microphone',
+					label: track.label || studioText().programMicDefault,
 					track,
 					encoderConfig: audioConfigForTrack(track)
 				},
@@ -2322,7 +2345,7 @@ export function App() {
 				...prev,
 				{
 					id: makeProgramId('scene'),
-					name: `Scene ${index + 1}`,
+					name: studioText().programSceneName.replace('{n}', String(index + 1)),
 					hotkey: index < 9 ? (`${index + 1}` as SceneDefinition['hotkey']) : null,
 					layers: sources.map((source, sourceIndex) => programLayerForSource(source, sourceIndex))
 				}
@@ -2361,7 +2384,7 @@ export function App() {
 
 	function startProgramSession(initialSceneId: string): void {
 		if (!bridge) {
-			setProgramError('Pipeline worker is not ready.');
+			setProgramError(studioText().programWorkerNotReady);
 			return;
 		}
 		const sources = [...programSourceHandles.values()].map(({ descriptor }) => descriptor);
@@ -2423,7 +2446,7 @@ export function App() {
 			payload,
 			transform
 		});
-		setStatusLine('Callout added');
+		setStatusLine(studioText().calloutAdded);
 	}
 
 	function requestPreviewRegionPick(onPick: (x: number, y: number) => void): void {
@@ -2536,8 +2559,11 @@ export function App() {
 				cleanupController.handlePipelineMessage(msg);
 				setStatusLine(
 					msg.ok
-						? 'Cleaned audio asset applied'
-						: `Audio cleanup failed: ${msg.message ?? 'unknown error'}`
+						? studioText().cleanedAudioApplied
+						: studioText().audioCleanupFailed.replace(
+								'{message}',
+								msg.message ?? studioText().unknownError
+							)
 				);
 				break;
 			case 'matte-status':
@@ -2557,26 +2583,34 @@ export function App() {
 				break;
 			case 'interp-progress':
 				setStatusLine(
-					`Frame interpolation · ${Math.round(msg.fraction * 100)}% (${msg.processedFrames}/${msg.totalFrames})`
+					studioText()
+						.frameInterpolationProgress.replace('{percent}', String(Math.round(msg.fraction * 100)))
+						.replace('{done}', String(msg.processedFrames))
+						.replace('{total}', String(msg.totalFrames))
 				);
 				break;
 			case 'interp-preview-ready':
 				setStatusLine(
-					`Frame interpolation preview ready · ${msg.segment.startS.toFixed(2)}-${msg.segment.endS.toFixed(2)}s`
+					studioText()
+						.frameInterpolationPreviewReady.replace('{start}', msg.segment.startS.toFixed(2))
+						.replace('{end}', msg.segment.endS.toFixed(2))
 				);
 				break;
 			case 'interp-refusal':
 				setInterpolationRefusals((count) => count + 1);
 				recordInterpolationError(
-					`Refused ${msg.reason} at ${msg.range.startS.toFixed(2)}-${msg.range.endS.toFixed(2)}s`
+					studioText()
+						.interpRefused.replace('{reason}', msg.reason)
+						.replace('{start}', msg.range.startS.toFixed(2))
+						.replace('{end}', msg.range.endS.toFixed(2))
 				);
 				break;
 			case 'interp-cancelled':
-				setStatusLine('Frame interpolation canceled');
+				setStatusLine(studioText().frameInterpolationCanceled);
 				break;
 			case 'interp-error':
 				recordInterpolationError(msg.message);
-				setStatusLine(`Frame interpolation unavailable: ${msg.message}`);
+				setStatusLine(studioText().frameInterpolationUnavailable.replace('{message}', msg.message));
 				break;
 			case 'beauty-model-status':
 				setBeautyModelStatus(msg.status);
@@ -2591,13 +2625,15 @@ export function App() {
 				break;
 			case 'asr-caption-track-created':
 				asrController.handlePipelineMessage(msg);
-				setStatusLine(`Auto-caption track "${msg.track.name}" created`);
+				setStatusLine(studioText().autoCaptionTrackCreated.replace('{name}', msg.track.name));
 				break;
 			case 'time-remap-error':
-				setRuntimeIssue(`Speed ramp failed: ${msg.reason}`);
+				setRuntimeIssue(studioText().speedRampFailed.replace('{reason}', msg.reason));
 				break;
 			case 'time-remap-updated':
-				setStatusLine(`Speed ramp applied (new duration: ${msg.outputDurationS.toFixed(2)}s)`);
+				setStatusLine(
+					studioText().speedRampApplied.replace('{duration}', msg.outputDurationS.toFixed(2))
+				);
 				setRuntimeIssue(null);
 				break;
 			case 'translated-caption-track-created':
@@ -2614,13 +2650,13 @@ export function App() {
 				);
 				setStatusLine(
 					msg.lutFileName
-						? `Look preset exported (paired LUT: ${msg.lutFileName})`
-						: 'Look preset exported'
+						? studioText().lookPresetExportedPairedLut.replace('{lut}', msg.lutFileName)
+						: studioText().lookPresetExported
 				);
 				break;
 			}
 			case 'look-preset-error':
-				setRuntimeIssue(`Look preset import failed: ${msg.reason}`);
+				setRuntimeIssue(studioText().lookPresetImportFailed.replace('{reason}', msg.reason));
 				break;
 			case 'clock-update':
 				// Reduced tiers without SAB: the worker drives the clock over postMessage.
@@ -2642,35 +2678,37 @@ export function App() {
 					setWorkerRecoveryState('running');
 				}
 				if (msg.previewBackend === 'canvas2d') {
-					setRuntimeIssue(
-						'Limited WebCodecs tier active. Preview/export use a reduced worker Canvas2D backend.'
-					);
+					setRuntimeIssue(studioText().limitedWebCodecsTierActive);
 				} else if (msg.previewBackend === 'compat-webgpu') {
-					setRuntimeIssue(
-						'Compatibility GPU tier active. Preview/export use a reduced GPU backend.'
-					);
+					setRuntimeIssue(studioText().compatGpuTierActive);
 				} else if (!msg.webgpu) {
-					setRuntimeIssue(
-						msg.gpuUnavailableReason ??
-							'WebGPU is unavailable in this browser. Accelerated import, playback, effects, and export require a WebGPU-capable Chromium browser.'
-					);
+					setRuntimeIssue(msg.gpuUnavailableReason ?? studioText().webgpuUnavailable);
 				} else {
 					setRuntimeIssue(null);
 				}
 				setStatusLine(
 					msg.previewBackend === 'core-webgpu'
-						? `Pipeline ready · WebGPU (${msg.features.join(', ') || 'default'})`
+						? studioText()
+								.pipelineReadyWebgpu.replace(
+									'{features}',
+									msg.features.join(', ') || studioText().defaultFeature
+								)
 						: msg.previewBackend === 'compat-webgpu'
-							? 'Compatibility GPU ready · reduced effects/export'
+							? studioText().compatGpuReady
 							: msg.previewBackend === 'canvas2d'
-								? 'Limited WebCodecs ready · Canvas2D preview/export'
-								: `Limited shell · ${msg.gpuUnavailableReason ?? 'preview unavailable'}`
+								? studioText().limitedWebCodecsReady
+								: studioText().limitedShellStatus.replace(
+										'{reason}',
+										msg.gpuUnavailableReason ?? studioText().previewUnavailableTerse
+									)
 				);
 				bridge?.send({ type: 'interp-probe' });
 				break;
 			case 'import-progress':
 				setImporting(true);
-				setStatusLine(msg.stage === 'reading' ? 'Reading file…' : 'Extracting metadata…');
+				setStatusLine(
+					msg.stage === 'reading' ? studioText().readingFile : studioText().extractingMetadata
+				);
 				break;
 			case 'import-complete':
 				setImporting(false);
@@ -2684,7 +2722,7 @@ export function App() {
 				// it now would erase the snapshot that just arrived.
 				// Duration is written to the shared clock by the worker; the rAF reader
 				// in createSharedClock() surfaces it. Main thread never writes the SAB.
-				setStatusLine(`Loaded ${msg.metadata.fileName}`);
+				setStatusLine(studioText().loadedFile.replace('{name}', msg.metadata.fileName));
 				break;
 			case 'timeline-state': {
 				setTimeline(msg.timeline);
@@ -2726,24 +2764,34 @@ export function App() {
 				setSelectedCaptionSegmentIds(
 					msg.result.track.segments[0] ? [msg.result.track.segments[0].id] : []
 				);
-				setStatusLine(
-					msg.result.diagnostics.length > 0
-						? `Imported captions with ${msg.result.diagnostics.length} diagnostic${msg.result.diagnostics.length === 1 ? '' : 's'}`
-						: 'Imported captions'
-				);
-				break;
+setStatusLine(
+						msg.result.diagnostics.length > 0
+							? (msg.result.diagnostics.length === 1
+									? studioText().importedCaptionsWithDiagOne
+									: studioText().importedCaptionsWithDiagMany
+								).replace('{n}', String(msg.result.diagnostics.length))
+							: studioText().importedCaptions
+					);
+					break;
 			case 'caption-custom-presets-updated':
 				setCustomAnimCaptionPresets([...msg.presets]);
 				break;
 			case 'caption-custom-preset-import-failed':
-				setStatusLine(`Preset import failed: ${msg.field} — ${msg.message}`);
+				setStatusLine(
+					studioText()
+						.presetImportFailed.replace('{field}', msg.field)
+						.replace('{message}', msg.message)
+				);
 				break;
 			case 'caption-export-result':
 				for (const file of msg.files) {
 					downloadTextFile(file.fileName, file.mimeType, file.content);
 				}
 				setStatusLine(
-					`Exported ${msg.files.length} caption file${msg.files.length === 1 ? '' : 's'}`
+					(msg.files.length === 1
+						? studioText().exportedCaptionFilesOne
+						: studioText().exportedCaptionFilesMany
+					).replace('{n}', String(msg.files.length))
 				);
 				break;
 			case 'interchange-result':
@@ -2753,21 +2801,26 @@ export function App() {
 					msg.text
 				).catch((error: unknown) => {
 					const message = error instanceof Error ? error.message : String(error);
-					setInterchangeMessage(`Save failed: ${message}`);
-					setStatusLine(`Interchange save failed: ${message}`);
+					setInterchangeMessage(studioText().saveFailed.replace('{message}', message));
+					setStatusLine(studioText().interchangeSaveFailed.replace('{message}', message));
 				});
 				setInterchangeWarnings(msg.warnings);
 				setInterchangeMessage(
 					msg.warnings.length > 0
-						? `Exported ${msg.suggestedName} with ${msg.warnings.length} warning${msg.warnings.length === 1 ? '' : 's'}`
-						: `Exported ${msg.suggestedName}`
+						? (msg.warnings.length === 1
+								? studioText().exportedWithWarningsOne
+								: studioText().exportedWithWarningsMany
+							)
+								.replace('{name}', msg.suggestedName)
+								.replace('{n}', String(msg.warnings.length))
+						: studioText().exportedFileName.replace('{name}', msg.suggestedName)
 				);
-				setStatusLine(`Exported ${msg.suggestedName}`);
+				setStatusLine(studioText().exportedFileName.replace('{name}', msg.suggestedName));
 				break;
 			case 'interchange-error':
 				setInterchangeWarnings([]);
-				setInterchangeMessage(`Export failed: ${msg.message}`);
-				setStatusLine(`Interchange export failed: ${msg.message}`);
+				setInterchangeMessage(studioText().exportFailed.replace('{message}', msg.message));
+				setStatusLine(studioText().interchangeExportFailed.replace('{message}', msg.message));
 				break;
 			case 'history-state':
 				setHistoryState({ canUndo: msg.canUndo, canRedo: msg.canRedo });
@@ -2805,7 +2858,7 @@ export function App() {
 					savedAt: msg.savedAt,
 					sources: msg.sources
 				});
-				setStatusLine(`Autosave available · ${formatSavedAt(msg.savedAt)}`);
+				setStatusLine(studioText().autosaveAvailable.replace('{time}', formatSavedAt(msg.savedAt)));
 				break;
 			case 'restore-result':
 				setRestoreOffer(null);
@@ -2864,15 +2917,18 @@ export function App() {
 				setExportResult(null);
 				setExportProgress(msg.progress);
 				setStatusLine(
-					`Exporting ${msg.progress.codec.toUpperCase()} ${msg.progress.container.toUpperCase()} · ${Math.round(msg.progress.percent * 100)}%`
+					studioText()
+						.exportingProgress.replace('{codec}', msg.progress.codec.toUpperCase())
+						.replace('{container}', msg.progress.container.toUpperCase())
+						.replace('{percent}', String(Math.round(msg.progress.percent * 100)))
 				);
 				break;
 			case 'export-complete':
 				setExporting(false);
 				setExportProgress(null);
 				setExportError(null);
-				setExportResult(`Exported ${msg.fileName}`);
-				setStatusLine(`Export complete · ${msg.mimeType}`);
+				setExportResult(studioText().exportedFileName.replace('{name}', msg.fileName));
+				setStatusLine(studioText().exportCompleteMime.replace('{mime}', msg.mimeType));
 				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-download-ready': {
@@ -2880,22 +2936,22 @@ export function App() {
 				setExporting(false);
 				setExportProgress(null);
 				setExportError(null);
-				setExportResult(`Exported ${msg.fileName}`);
-				setStatusLine(`Export ready · ${msg.mimeType}`);
+				setExportResult(studioText().exportedFileName.replace('{name}', msg.fileName));
+				setStatusLine(studioText().exportReadyMime.replace('{mime}', msg.mimeType));
 				reanchorLivePreviewAfterExport();
 				break;
 			}
 			case 'export-warning':
 				setExportWarnings((warnings) => [...warnings, msg.message]);
-				setStatusLine(`Export warning: ${msg.message}`);
+				setStatusLine(studioText().exportWarning.replace('{message}', msg.message));
 				break;
 			case 'export-canceled':
 				setExporting(false);
 				setExportProgress(null);
 				setExportError(null);
 				setExportWarnings([]);
-				setExportResult('Export canceled');
-				setStatusLine('Export canceled');
+				setExportResult(studioText().exportCanceled);
+				setStatusLine(studioText().exportCanceled);
 				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-error':
@@ -2904,7 +2960,7 @@ export function App() {
 				setExportResult(null);
 				setExportError(msg.message);
 				setExportWarnings([]);
-				setStatusLine(`Export failed: ${msg.message}`);
+				setStatusLine(studioText().exportFailed.replace('{message}', msg.message));
 				reanchorLivePreviewAfterExport();
 				break;
 			case 'presets-state':
@@ -2921,19 +2977,28 @@ export function App() {
 					...prev,
 					jobs: prev.jobs.map((j) => (j.id === msg.jobId ? { ...j, progress: msg.progress } : j))
 				}));
-				setStatusLine(`Queue: ${Math.round(msg.progress.percent * 100)}%`);
+				setStatusLine(
+					studioText().queuePercent.replace('{n}', String(Math.round(msg.progress.percent * 100)))
+				);
 				break;
 			case 'queue-job-complete':
-				setStatusLine(`Queue: ${msg.fileName} done (${Math.round(msg.elapsedSeconds)}s)`);
+				setStatusLine(
+					studioText()
+						.queueFileDone.replace('{file}', msg.fileName)
+						.replace('{n}', String(Math.round(msg.elapsedSeconds)))
+				);
 				break;
 			case 'queue-job-failed':
-				setStatusLine(`Queue job failed: ${msg.error}`);
+				setStatusLine(studioText().queueJobFailed.replace('{error}', msg.error));
 				break;
 			case 'queue-job-canceled':
 				break;
 			case 'queue-complete':
 				setStatusLine(
-					`Queue done: ${msg.completedCount} completed, ${msg.failedCount} failed, ${msg.canceledCount} canceled`
+					studioText()
+						.queueDone.replace('{completed}', String(msg.completedCount))
+						.replace('{failed}', String(msg.failedCount))
+						.replace('{canceled}', String(msg.canceledCount))
 				);
 				reanchorLivePreviewAfterExport();
 				break;
@@ -2962,17 +3027,17 @@ export function App() {
 					setExportBackend('none');
 					setPreviewReady(false);
 					setExportReady(false);
-					setStatusLine('GPU recovery in progress…');
+					setStatusLine(studioText().gpuRecoveryInProgress);
 				} else if (msg.state === 'failed') {
 					setWebgpuAvailable(false);
 					setPreviewBackend('none');
 					setExportBackend('none');
 					setPreviewReady(false);
 					setExportReady(false);
-					setRuntimeIssue('GPU recovery failed. Accelerated features are unavailable.');
-					setStatusLine('GPU recovery failed · limited mode');
+					setRuntimeIssue(studioText().gpuRecoveryFailed);
+					setStatusLine(studioText().gpuRecoveryFailedLimited);
 				} else {
-					setStatusLine('Recovery state updated.');
+					setStatusLine(studioText().recoveryStateUpdated);
 				}
 				break;
 			case 'source-health': {
@@ -3003,13 +3068,15 @@ export function App() {
 				setBundleBusy(false);
 				setBundlePhase(null);
 				setBundleJobId(null);
-				setBundleMessage(msg.reason ?? (msg.ok ? 'Bundle job complete.' : 'Bundle job failed.'));
+				setBundleMessage(
+					msg.reason ?? (msg.ok ? studioText().bundleJobComplete : studioText().bundleJobFailed)
+				);
 				if (msg.ok && msg.projectId) {
 					setRestoreOffer(null);
 					// A loaded bundle is a fresh project; the worker resets loopEnabled in
 					// applyImportedDoc, so mirror that here.
 					setLoopPlayback(false);
-					setStatusLine(msg.reason ?? 'Bundle job complete.');
+					setStatusLine(msg.reason ?? studioText().bundleJobComplete);
 				}
 				break;
 			case 'dispose-complete':
@@ -3035,7 +3102,7 @@ export function App() {
 				setProgramActiveSceneId(null);
 				releaseActiveProgramMonitorTracks();
 				stopProgramWriter();
-				setStatusLine(`Program Mode: ${msg.detail}`);
+				setStatusLine(studioText().programModeFailed.replace('{message}', msg.detail));
 				break;
 			case 'program-landed':
 				setProgramSessionState('idle');
@@ -3044,7 +3111,10 @@ export function App() {
 				releaseActiveProgramMonitorTracks();
 				stopProgramWriter();
 				setStatusLine(
-					`Program landed · ${msg.isoTrackIds.length} ISO track${msg.isoTrackIds.length === 1 ? '' : 's'} + layout`
+					(msg.isoTrackIds.length === 1
+						? studioText().programLandedOne
+						: studioText().programLandedMany
+					).replace('{n}', String(msg.isoTrackIds.length))
 				);
 				setActiveSideRailTab('inspector');
 				break;
@@ -3055,26 +3125,30 @@ export function App() {
 				break;
 			case 'replay-capture-error':
 				releaseReplayCaptureStream();
-				setStatusLine(`Capture: ${msg.message}`);
+				setStatusLine(studioText().captureError.replace('{message}', msg.message));
 				break;
 			case 'replay-buffer-state':
 				setReplayBufferState(msg.state);
 				break;
 			case 'replay-save-progress':
 				setReplaySaveInProgress(true);
-				setStatusLine(`Saving replay… ${msg.chunksWritten}/${msg.totalChunks} chunks`);
+				setStatusLine(
+					studioText()
+						.savingReplay.replace('{done}', String(msg.chunksWritten))
+						.replace('{total}', String(msg.totalChunks))
+				);
 				break;
 			case 'replay-save-complete':
 				setReplaySaveInProgress(false);
-				setStatusLine(`Replay saved · ${msg.fileName}`);
+				setStatusLine(studioText().replaySaved.replace('{name}', msg.fileName));
 				break;
 			case 'replay-save-error':
 				setReplaySaveInProgress(false);
-				setStatusLine(`Replay save failed: ${msg.message}`);
+				setStatusLine(studioText().replaySaveFailed.replace('{message}', msg.message));
 				break;
 			case 'replay-save-canceled':
 				setReplaySaveInProgress(false);
-				setStatusLine('Replay save canceled');
+				setStatusLine(studioText().replaySaveCanceled);
 				break;
 			case 'live-chain-config':
 				setLiveChainConfig(msg.config);
@@ -3083,7 +3157,7 @@ export function App() {
 				setLiveChainLatencyMs(msg.latencyMs);
 				break;
 			case 'live-chain-error':
-				setStatusLine(`Live audio chain: ${msg.message}`);
+				setStatusLine(studioText().liveAudioChainError.replace('{message}', msg.message));
 				break;
 			case 'capture-status':
 				setRecorderStatus({
@@ -3103,12 +3177,15 @@ export function App() {
 				break;
 			}
 			case 'capture-error':
-				setStatusLine(`Recorder: ${msg.detail}`);
+				setStatusLine(studioText().recorderError.replace('{message}', msg.detail));
 				break;
 			case 'capture-landed':
 				setRecorderLandedSessionId(msg.sessionId);
 				setStatusLine(
-					`Recorder landed ${msg.trackIds.length} track${msg.trackIds.length === 1 ? '' : 's'}.`
+					(msg.trackIds.length === 1
+						? studioText().recorderLandedOne
+						: studioText().recorderLandedMany
+					).replace('{n}', String(msg.trackIds.length))
 				);
 				break;
 			case 'capture-dom-tap-init':
@@ -3185,7 +3262,9 @@ export function App() {
 					return next;
 				});
 				setStatusLine(
-					`Beat analysis complete: ${msg.tempoBpm.toFixed(0)} BPM, ${msg.beatTimesMs.length} beats`
+					studioText()
+						.beatAnalysisComplete.replace('{bpm}', msg.tempoBpm.toFixed(0))
+						.replace('{n}', String(msg.beatTimesMs.length))
 				);
 				break;
 			case 'beat-analysis-error':
@@ -3194,7 +3273,7 @@ export function App() {
 					next.delete(msg.sourceId);
 					return next;
 				});
-				setStatusLine(`Beat analysis failed: ${msg.message}`);
+				setStatusLine(studioText().beatAnalysisFailed.replace('{message}', msg.message));
 				break;
 			case 'beat-settings':
 				// Worker is the source of truth on restore/import -- adopt the
@@ -3296,7 +3375,7 @@ export function App() {
 		// A restarted worker republishes its authoritative reset (writeClockFull) on
 		// init, and `ready` re-attaches the reader below.
 		clock.setActive(false);
-		const message = event?.message ?? 'Worker terminated unexpectedly';
+		const message = event?.message ?? studioText().workerTerminatedUnexpectedly;
 		setRecentErrorLog((prev) =>
 			addRecentError(
 				prev,
@@ -3311,8 +3390,8 @@ export function App() {
 		);
 		setStatusLine(
 			crashState === 'throttled'
-				? 'Worker crashed · restart limit reached. Reload the page to recover.'
-				: 'Worker crashed · restart available'
+				? studioText().workerCrashedThrottled
+				: studioText().workerCrashedRestartAvailable
 		);
 		if (crashState !== 'throttled') {
 			void restartWorker();
@@ -3342,7 +3421,7 @@ export function App() {
 		}
 
 		awaitingRestartReady = true;
-		setStatusLine('Restarting worker…');
+		setStatusLine(studioText().restartingWorker);
 		setPreviewKey((k) => k + 1);
 	}
 
@@ -3358,10 +3437,8 @@ export function App() {
 			setExportBackend('none');
 			setPreviewReady(false);
 			setExportReady(false);
-			setRuntimeIssue(
-				'Preview unavailable: this browser exposes neither WebGPU nor WebCodecs decode support.'
-			);
-			setStatusLine('Shell-only · preview and export unavailable');
+			setRuntimeIssue(studioText().previewUnavailableNoWebgpu);
+			setStatusLine(studioText().shellOnlyPreviewUnavailable);
 			return;
 		}
 		initSent = true;
@@ -3383,9 +3460,9 @@ export function App() {
 				setAudioWarning(null);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				setAudioWarning(`Audio disabled: ${message}`);
+				setAudioWarning(studioText().audioDisabled.replace('{message}', message));
 				setAudioSabReady(false);
-				setStatusLine('Audio disabled · starting video pipeline');
+				setStatusLine(studioText().audioDisabledStartingVideo);
 				setRecentErrorLog((prev) =>
 					addRecentError(
 						prev,
@@ -3393,7 +3470,7 @@ export function App() {
 							code: 'audio.init_failed',
 							subsystem: 'audio',
 							severity: 'warning',
-							message: `Audio init failed: ${message}`,
+							message: studioText().audioInitFailed.replace('{message}', message),
 							recoveryActionIds: ['retry-audio']
 						})
 					)
@@ -3417,8 +3494,10 @@ export function App() {
 			pendingInitCanvas = null;
 		} catch (error) {
 			handleInitError(
-				'Canvas initialization failed',
-				'Failed to initialize editor canvas. Try reloading.',
+				studioLocale() === 'zh-CN' ? studioText().canvasInitializationFailed : 'Canvas initialization failed',
+				studioLocale() === 'zh-CN'
+					? studioText().editorCanvasInitFailed
+					: 'Failed to initialize editor canvas. Try reloading.',
 				error
 			);
 		}
@@ -3428,7 +3507,7 @@ export function App() {
 		if (importing()) return;
 		const generation = ++compatibilityImportGeneration;
 		setImporting(true);
-		setStatusLine('Loading compatibility preview…');
+		setStatusLine(studioText().loadingCompatibilityPreview);
 		try {
 			const preview = await extractCompatibilityPreview(file);
 			if (generation !== compatibilityImportGeneration) {
@@ -3462,11 +3541,11 @@ export function App() {
 			setMarkers([]);
 			setSessionEventLogs([]);
 			setSelectedClipRefs([]);
-			setStatusLine(`Loaded ${preview.fileName} · compatibility preview`);
+			setStatusLine(studioText().loadedCompatibilityPreview.replace('{name}', preview.fileName));
 		} catch (error) {
 			if (generation !== compatibilityImportGeneration) return;
 			const message = error instanceof Error ? error.message : String(error);
-			setStatusLine(`Compatibility import failed: ${message}`);
+			setStatusLine(studioText().compatibilityImportFailed.replace('{message}', message));
 		} finally {
 			if (generation === compatibilityImportGeneration) {
 				setImporting(false);
@@ -3541,7 +3620,7 @@ export function App() {
 			void importCompatibilityMedia(file);
 			return;
 		}
-		setStatusLine(importHint() ?? 'Import unavailable in limited mode');
+		setStatusLine(importHint() ?? studioText().importUnavailableLimited);
 	}
 
 	async function pickImportMedia(): Promise<boolean> {
@@ -3565,7 +3644,11 @@ export function App() {
 						code: 'import.picker_failed',
 						subsystem: 'import',
 						severity: 'warning',
-						message: `Import picker failed: ${error instanceof Error ? error.message : String(error)}`
+						message: studioText()
+							.importPickerFailed.replace(
+								'{message}',
+								error instanceof Error ? error.message : String(error)
+							)
 					})
 				)
 			);
@@ -3598,7 +3681,11 @@ export function App() {
 							code: 'import.relink_failed',
 							subsystem: 'import',
 							severity: 'warning',
-							message: `Re-link picker failed: ${error instanceof Error ? error.message : String(error)}`
+							message: studioText()
+							.relinkPickerFailed.replace(
+								'{message}',
+								error instanceof Error ? error.message : String(error)
+							)
 						})
 					)
 				);
@@ -3633,7 +3720,7 @@ export function App() {
 
 	async function pickOutputHandle(settings: ExportSettings): Promise<FileSystemFileHandle | null> {
 		if (typeof window.showSaveFilePicker !== 'function') {
-			throw new Error('Export requires the File System Access API in a Chromium desktop browser.');
+			throw new Error(studioText().exportRequiresFileSystemAccess);
 		}
 		const isWebm = settings.container === 'webm';
 		try {
@@ -3642,11 +3729,11 @@ export function App() {
 				types: [
 					isWebm
 						? {
-								description: 'WebM video',
+								description: studioText().webmVideo,
 								accept: { 'video/webm': ['.webm'] }
 							}
 						: {
-								description: 'MP4 video',
+								description: studioText().mp4Video,
 								accept: { 'video/mp4': ['.mp4'] }
 							}
 				]
@@ -3671,8 +3758,8 @@ export function App() {
 				suggestedName,
 				types: [
 					suggestedName.endsWith('.webm')
-						? { description: 'WebM video', accept: { 'video/webm': ['.webm'] } }
-						: { description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }
+						? { description: studioText().webmVideo, accept: { 'video/webm': ['.webm'] } }
+						: { description: studioText().mp4Video, accept: { 'video/mp4': ['.mp4'] } }
 				]
 			});
 			bridge?.send({ type: 'queue-job-output', jobId, handle });
@@ -3683,9 +3770,7 @@ export function App() {
 			// activation has expired. Without a distinct signal, the worker
 			// reads the skip as "user cancelled" and silently drops the job.
 			if (error instanceof DOMException && error.name === 'SecurityError') {
-				setStatusLine(
-					'Queue paused: pre-select all output files via Run Queue before starting (job activation expired).'
-				);
+				setStatusLine(studioText().queuePaused);
 				bridge?.send({ type: 'queue-job-skip', jobId });
 				bridge?.send({ type: 'queue-pause' });
 				return;
@@ -3697,14 +3782,14 @@ export function App() {
 	function queuePickerTypes(suggestedName: string): QueuePickerType[] {
 		return [
 			suggestedName.endsWith('.webm')
-				? { description: 'WebM video', accept: { 'video/webm': ['.webm'] } }
-				: { description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }
+				? { description: studioText().webmVideo, accept: { 'video/webm': ['.webm'] } }
+				: { description: studioText().mp4Video, accept: { 'video/mp4': ['.mp4'] } }
 		];
 	}
 
 	function queueProjectDisplayName(): string {
 		const sourceName = metadata()?.fileName.replace(/\.[^.]+$/, '');
-		return sourceName || 'Untitled project';
+		return sourceName || studioText().untitledProject;
 	}
 
 	function uniqueSuggestedName(name: string, used: Set<string>): string {
@@ -3736,9 +3821,7 @@ export function App() {
 			const directoryPicker = (window as DirectoryPickerWindow).showDirectoryPicker;
 			if (typeof directoryPicker !== 'function') {
 				setStatusLine(
-					coverFrame()
-						? 'Cover export needs a directory picker so the cover JPEG can be saved beside the video.'
-						: 'Queue needs a directory picker to run multiple pending exports.'
+					coverFrame() ? studioText().coverExportNeedsDirectory : studioText().queueNeedsDirectory
 				);
 				return false;
 			}
@@ -3767,7 +3850,7 @@ export function App() {
 				return true;
 			} catch (error) {
 				if (!isAbortError(error)) {
-					setStatusLine(`Queue destination failed: ${errorMessage(error)}`);
+					setStatusLine(studioText().queueDestinationFailed.replace('{message}', errorMessage(error)));
 				}
 				return false;
 			}
@@ -3789,7 +3872,7 @@ export function App() {
 			return true;
 		} catch (error) {
 			if (!isAbortError(error)) {
-				setStatusLine(`Queue destination failed: ${errorMessage(error)}`);
+				setStatusLine(studioText().queueDestinationFailed.replace('{message}', errorMessage(error)));
 			}
 			return false;
 		}
@@ -3810,8 +3893,8 @@ export function App() {
 
 	function interpolationExportUnavailableMessage(): string {
 		return INTERPOLATION_EXPORT_PIPELINE_WIRED
-			? 'Frame interpolation export requires a loaded, validated ONNX model.'
-			: 'Frame interpolation export is hidden until the ONNX model and export synthesis bridge are validated.';
+			? studioText().interpExportRequiresModel
+			: studioText().interpExportHidden;
 	}
 
 	function rejectUnavailableInterpolationExport(settings: ExportSettings): boolean {
@@ -3829,7 +3912,9 @@ export function App() {
 	) {
 		if (exportBackend() !== 'core-webgpu') {
 			setStatusLine(
-				'Render queue requires the Core WebGPU export tier. Use direct export in this browser tier.'
+				studioLocale() === 'zh-CN'
+					? studioText().renderQueueCoreTier
+					: 'Render queue requires the Core WebGPU export tier. Use direct export in this browser tier.'
 			);
 			return;
 		}
@@ -3841,7 +3926,7 @@ export function App() {
 			}
 		} else {
 			if (rangeMode === 'range' && !settings.range) {
-				setStatusLine('Queue range must have Out greater than In.');
+				setStatusLine(studioText().queueRangeInvalid);
 				return;
 			}
 			const jobRange =
@@ -3907,7 +3992,7 @@ export function App() {
 		setBundleBusy(false);
 		setBundlePhase(null);
 		setBundleJobId(null);
-		setBundleMessage('Bundle job canceled.');
+		setBundleMessage(studioText().bundleJobCanceled);
 	}
 
 	async function startExport(settings: ExportSettings) {
@@ -3916,8 +4001,8 @@ export function App() {
 		if (!exportSurfaceAvailable()) {
 			setExportError(
 				pipelineMode() === 'limited'
-					? 'Export is unavailable because this browser tier has no export backend.'
-					: 'Waiting for preview canvas before export can start.'
+					? studioText().exportUnavailableTier
+					: studioText().waitingForPreviewCanvas
 			);
 			return;
 		}
@@ -3930,27 +4015,27 @@ export function App() {
 		setExportResult(null);
 		setExportError(null);
 		setExportWarnings([]);
-		setStatusLine('Choosing export destination…');
+		setStatusLine(studioText().choosingExportDestination);
 		try {
 			let output: FileSystemFileHandle | null = null;
 			if (typeof window.showSaveFilePicker === 'function') {
 				output = await pickOutputHandle(settings);
 				if (!output) {
 					setExporting(false);
-					setStatusLine('Export canceled');
+					setStatusLine(studioText().exportCanceled);
 					return;
 				}
 			} else if (exportBackend() !== 'canvas2d') {
-				throw new Error('Export requires the File System Access API in this browser tier.');
+				throw new Error(studioText().exportRequiresFileSystemAccessTier);
 			}
 			const { bridge: b } = ensureWorker();
-			setStatusLine('Starting export…');
+			setStatusLine(studioText().startingExportMsg);
 			b.send({ type: 'export-start', settings, output });
 		} catch (e) {
 			setExporting(false);
 			const message = e instanceof Error ? e.message : String(e);
 			setExportError(message);
-			setStatusLine(`Export failed: ${message}`);
+			setStatusLine(studioText().exportFailed.replace('{message}', message));
 		}
 	}
 
@@ -4008,7 +4093,12 @@ export function App() {
 		if (clips.length === 0) return;
 		setTimelineClipboard(clips);
 		bridge?.send({ type: 'cache-clipboard-luts', clips: selectedClipRefs() });
-		setStatusLine(`Copied ${clips.length} clip${clips.length === 1 ? '' : 's'}`);
+		setStatusLine(
+			(clips.length === 1 ? studioText().copiedClipsOne : studioText().copiedClipsMany).replace(
+				'{n}',
+				String(clips.length)
+			)
+		);
 	}
 
 	function pasteClipboardClips() {
@@ -4136,35 +4226,35 @@ export function App() {
 				switch (probe.tier) {
 					case 'core-webgpu':
 						ensureWorker();
-						setStatusLine('Starting pipeline worker…');
+						setStatusLine(studioText().startingPipelineWorker);
 						break;
 					case 'compatibility-webgpu':
 						ensureWorker();
 						setRuntimeIssue(
 							probe.sharedArrayBuffer === 'supported'
-								? 'Compatibility GPU tier active. Preview remains client-side with reduced effects and export constraints.'
-								: 'Compatibility GPU tier active without SharedArrayBuffer. Clock updates use reduced rAF messages.'
+								? studioText().compatGpuTierActiveStatic
+								: studioText().compatGpuTierActiveNoSab
 						);
-						setStatusLine('Compatibility GPU tier · reduced effects');
+						setStatusLine(studioText().compatGpuTierReduced);
 						break;
 					case 'limited-webcodecs':
 						ensureWorker();
-						setRuntimeIssue(
-							'Limited WebCodecs tier active. Preview uses client-side compatibility rendering and export is codec constrained.'
-						);
-						setStatusLine('Limited WebCodecs tier · GPU effects unavailable');
+						setRuntimeIssue(studioText().limitedWebCodecsTierActive2);
+						setStatusLine(studioText().limitedWebCodecsTierReduced);
 						break;
 					case 'shell-only':
-						setRuntimeIssue(
-							'Preview unavailable: this browser exposes neither WebGPU nor WebCodecs decode support.'
-						);
-						setStatusLine('Shell-only · preview and export unavailable');
+						setRuntimeIssue(studioText().previewUnavailableNoWebgpu);
+						setStatusLine(studioText().shellOnlyPreviewUnavailable);
 						break;
 				}
 			} catch (error) {
 				handleInitError(
-					'Capability detection failed',
-					'Failed to detect browser capabilities. Try reloading.',
+					studioLocale() === 'zh-CN'
+						? studioText().capabilityDetectionFailed
+						: 'Capability detection failed',
+					studioLocale() === 'zh-CN'
+						? studioText().capabilityDetectionIssue
+						: 'Failed to detect browser capabilities. Try reloading.',
 					error
 				);
 				return;
@@ -4282,7 +4372,7 @@ export function App() {
 			cleanupController.dispose();
 			asrController.dispose();
 			reframeController.dispose();
-			drainPendingSourceFileRequests('Smart Reframe was torn down.');
+			drainPendingSourceFileRequests(studioText().smartReframeTornDown);
 			translationController.dispose();
 			draftController.dispose();
 			if (worker && bridge) {
@@ -4384,11 +4474,14 @@ export function App() {
 					onToggleScopes={() => setScopePanelCollapsed((prev) => !prev)}
 					scopesPanelVisible={scopePanelAvailable() && !scopePanelCollapsed()}
 					scopesPanelAvailable={scopePanelAvailable()}
-					onScrollToRenderQueue={() =>
-						document
-							.querySelector<HTMLElement>('.render-queue-panel')
-							?.scrollIntoView({ block: 'nearest' })
-					}
+					onScrollToRenderQueue={() => {
+						const panel = document.querySelector<HTMLElement>('.render-queue-panel');
+						if (panel) {
+							panel.scrollIntoView({ block: 'nearest' });
+						} else {
+							setStatusLine(studioText().queueEmptyHint);
+						}
+					}}
 					publishLive={publishBusy()}
 					timelineSnapEnabled={timelineSnapEnabled()}
 					timelineSnapToBeats={timelineSnapToBeats()}
@@ -4549,18 +4642,18 @@ export function App() {
 								onKeyDown={handleKeyDown}
 							>
 								<div class="bundle-replace-modal">
-									<p id="bundle-replace-title" class="bundle-replace-modal-title">
-										Replace current project?
-									</p>
+<p id="bundle-replace-title" class="bundle-replace-modal-title">
+											{studioText().replaceProjectTitle}
+										</p>
 									<p id="bundle-replace-message" class="bundle-replace-modal-message">
 										{prompt.message}
 									</p>
-									<div class="bundle-replace-modal-actions">
-										<Button variant="outline" onClick={cancel}>
-											Cancel
-										</Button>
-										<Button onClick={replace}>Replace</Button>
-									</div>
+<div class="bundle-replace-modal-actions">
+											<Button variant="outline" onClick={cancel}>
+												{studioText().cancel}
+											</Button>
+											<Button onClick={replace}>{studioText().replaceProject}</Button>
+										</div>
 								</div>
 							</div>
 						);
@@ -4578,8 +4671,10 @@ export function App() {
 									<>
 										<p class="restore-banner-title">{studioText().offlineMedia}</p>
 										<p class="restore-banner-detail">
-											{unresolvedSources().length} source
-											{unresolvedSources().length === 1 ? '' : 's'} need re-linking.
+											{(unresolvedSources().length === 1
+												? studioText().needRelinkingOne
+												: studioText().needRelinkingMany
+											).replace('{n}', String(unresolvedSources().length))}
 										</p>
 									</>
 								}
@@ -4602,14 +4697,14 @@ export function App() {
 									{(source) => (
 										<li class="restore-source-item">
 											<span title={formatSourceSummary(source)}>{formatSourceSummary(source)}</span>
-											<Button
-												size="sm"
-												onClick={() => void pickRelinkFile(source.sourceId)}
-												title={`Re-link ${source.fileName}`}
-											>
-												<Link2 size={13} aria-hidden="true" />
-												Re-link
-											</Button>
+<Button
+													size="sm"
+													onClick={() => void pickRelinkFile(source.sourceId)}
+													title={studioText().relinkFileTitle.replace('{name}', source.fileName)}
+												>
+													<Link2 size={13} aria-hidden="true" />
+													{studioText().relink}
+												</Button>
 										</li>
 									)}
 								</For>
@@ -4617,14 +4712,14 @@ export function App() {
 						</Show>
 						<Show when={restoreOffer()}>
 							<div class="restore-actions">
-								<Button onClick={() => bridge?.send({ type: 'restore-project' })}>
-									<RotateCcw size={14} aria-hidden="true" />
-									Restore
-								</Button>
-								<Button variant="outline" onClick={startNewProject}>
-									<Plus size={14} aria-hidden="true" />
-									New
-								</Button>
+<Button onClick={() => bridge?.send({ type: 'restore-project' })}>
+										<RotateCcw size={14} aria-hidden="true" />
+										{studioText().restore}
+									</Button>
+									<Button variant="outline" onClick={startNewProject}>
+										<Plus size={14} aria-hidden="true" />
+										{studioText().newProject}
+									</Button>
 							</div>
 						</Show>
 						<input
@@ -4645,10 +4740,14 @@ export function App() {
 							role={report().status === 'blocked' ? 'alert' : undefined}
 						>
 							<div class="restore-banner-copy">
-								<p class="restore-banner-title">Media health · {report().fileName}</p>
+								<p class="restore-banner-title">
+									{studioText().mediaHealth.replace('{name}', report().fileName)}
+								</p>
 								<p class="restore-banner-detail">
-									{report().warnings.length} issue
-									{report().warnings.length === 1 ? '' : 's'} detected.
+									{(report().warnings.length === 1
+										? studioText().issuesDetectedOne
+										: studioText().issuesDetectedMany
+									).replace('{n}', String(report().warnings.length))}
 								</p>
 							</div>
 							<ul class="source-health-list">
@@ -4663,10 +4762,10 @@ export function App() {
 							<button
 								type="button"
 								class="export-why-link"
-								onClick={() => openDocs('importing-media')}
-							>
-								What these warnings mean
-							</button>
+onClick={() => openDocs('importing-media')}
+								>
+									{studioText().whatTheseWarningsMean}
+								</button>
 						</section>
 					)}
 				</Show>
@@ -4675,7 +4774,7 @@ export function App() {
 						class={`workspace${previewSurfaceAvailable() ? ' has-bin' : ''}${sideRailCollapsed() ? ' rail-collapsed' : ''}`}
 					>
 						<Show when={previewSurfaceAvailable()}>
-							<aside class="dock-left" aria-label="Library">
+							<aside class="dock-left" aria-label={studioText().library}>
 								<SecondaryRailTabs
 									idPrefix="dock"
 									label={studioLocale() === 'zh-CN' ? '素材库分区' : 'Library sections'}
@@ -4802,7 +4901,7 @@ export function App() {
 									playing={clock.playing}
 									locale={studioLocale}
 								/>
-								<section class="ascii-monitor" aria-label="ASCII program preview">
+								<section class="ascii-monitor" aria-label={studioText().asciiProgramPreview}>
 									<p class="live-preview-hud">
 										{livePreviewWaiting() ? '等待视频帧' : livePreviewHud().mode} · 源{' '}
 										{livePreviewHud().sourceFps.toFixed(0)} FPS · ASCII{' '}
@@ -4872,7 +4971,7 @@ export function App() {
 								<div
 									class="region-pick-overlay"
 									role="application"
-									aria-label="Drag to set zoom region"
+									aria-label={studioText().dragToSetZoomRegion}
 									tabIndex={0}
 									onPointerUp={(e) => {
 										const rect = e.currentTarget.getBoundingClientRect();
@@ -4886,14 +4985,14 @@ export function App() {
 										if (e.key === 'Escape') setPreviewRegionPickHandler(null);
 									}}
 								>
-									<p>Drag on the preview to set the zoom region. Press Escape to cancel.</p>
+									<p>{studioText().zoomRegionHint}</p>
 								</div>
 							</Show>
 							<Show when={previewSurfaceAvailable() && calloutPlacementActive()}>
 								<div
-									class="callout-placement-overlay"
-									role="application"
-									aria-label="Draw callout"
+class="callout-placement-overlay"
+										role="application"
+										aria-label={studioText().drawCallout}
 									tabIndex={0}
 									onKeyDown={(e) => {
 										if (e.key === 'Escape') endCalloutPlacement();
@@ -4921,7 +5020,9 @@ export function App() {
 										target.addEventListener('pointerup', onPointerUp);
 									}}
 								>
-									<p>Drag to place {calloutPlacementKind()} callout. Press Escape to cancel.</p>
+									<p>
+										{studioText().calloutPlacementHint.replace('{kind}', calloutPlacementKind())}
+									</p>
 								</div>
 							</Show>
 							<Show when={previewSurfaceAvailable()}>
@@ -4930,15 +5031,19 @@ export function App() {
 									class={`safe-area-toggle${safeAreaGuides() ? ' is-active' : ''}`}
 									aria-pressed={safeAreaGuides()}
 									onClick={() => setSafeAreaGuides((on) => !on)}
-									title="Toggle title/action safe-area guides"
+									title={studioText().toggleSafeAreaGuides}
 								>
-									Safe areas
+									{studioText().safeAreas}
 								</button>
 							</Show>
 							{/* Phase 39: format picker, platform picker, cover button */}
 							<Show when={previewSurfaceAvailable()}>
 								<div class="phase39-controls">
-									<fieldset role="group" aria-label="Project format" class="phase39-format-group">
+									<fieldset
+										role="group"
+										aria-label={studioText().projectFormat}
+										class="phase39-format-group"
+									>
 										<For each={['16:9', '9:16', '1:1', '4:5'] as const}>
 											{(aspect) => (
 												<button
@@ -4950,7 +5055,9 @@ export function App() {
 														}),
 														'text-xs'
 													)}
-													aria-label={`Set project format to ${aspect} (${aspectLabel(aspect)})`}
+													aria-label={studioText()
+															.setProjectFormatAria.replace('{aspect}', aspect)
+															.replace('{label}', aspectLabel(aspect))}
 													onClick={() => bridge?.send({ type: 'set-project-format', aspect })}
 												>
 													{aspect}
@@ -4961,11 +5068,11 @@ export function App() {
 									<Show when={matchingPlatforms().length > 0}>
 										<select
 											class="phase39-platform-select"
-											aria-label="Safe zone platform"
+											aria-label={studioText().safeZonePlatform}
 											value={selectedPlatformId()}
 											onChange={(e) => setSelectedPlatformId(e.currentTarget.value)}
 										>
-											<option value="">Off</option>
+											<option value="">{studioText().off}</option>
 											<For each={matchingPlatforms()}>
 												{(p) => <option value={p.id}>{p.label}</option>}
 											</For>
@@ -4987,18 +5094,18 @@ export function App() {
 												titleClipId: coverTitleClipId() || null
 											})
 										}
-										title="Set cover frame at current playhead position"
-									>
-										Cover
-									</button>
+title={studioText().setCoverFrameTitle}
+										>
+											{studioText().cover}
+										</button>
 									<Show when={coverTitleOptions().length > 0}>
 										<select
-											aria-label="Cover title overlay"
+											aria-label={studioText().coverTitleOverlay}
 											value={coverTitleClipId()}
 											onChange={(e) => setCoverTitleClipId(e.currentTarget.value)}
 											class="cover-title-select"
 										>
-											<option value="">No title</option>
+											<option value="">{studioText().noTitle}</option>
 											<For each={coverTitleOptions()}>
 												{(option) => <option value={option.id}>{option.label}</option>}
 											</For>
@@ -5010,7 +5117,7 @@ export function App() {
 												class="cover-thumb-preview"
 												src={url()}
 												alt=""
-												aria-label="Cover frame preview"
+												aria-label={studioText().coverFramePreview}
 											/>
 										)}
 									</Show>
@@ -5031,28 +5138,28 @@ export function App() {
 							<Show when={!metadata() && !importing() && !hasTimeline()}>
 								<div class="preview-empty">
 									<div>
-										<p class="preview-empty-eyebrow">
-											{pipelineMode() === 'limited' || pipelineMode() === 'blocked'
-												? 'Compatibility'
-												: 'Preview'}
-										</p>
-										<p class="preview-empty-title">
-											{previewSurfaceAvailable()
-												? studioText().dropToStart
-												: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
-													? 'Preview unavailable'
-													: studioText().dropToStart}
-										</p>
-										<p class="preview-empty-copy">
-											{previewSurfaceAvailable()
-												? studioText().dropHere
-												: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
-													? (limitedIssue() ??
-														(compatibilityImportEnabled()
-															? 'You can still import files — the preview will use a reduced mode.'
-															: 'This browser is missing some capabilities. Editing still works, just with fewer effects.'))
-													: studioText().dropHere}
-										</p>
+<p class="preview-empty-eyebrow">
+												{pipelineMode() === 'limited' || pipelineMode() === 'blocked'
+													? studioText().compatibilityEyebrow
+													: studioText().previewEyebrow}
+											</p>
+											<p class="preview-empty-title">
+												{previewSurfaceAvailable()
+													? studioText().dropToStart
+													: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
+														? studioText().previewUnavailable
+														: studioText().dropToStart}
+											</p>
+											<p class="preview-empty-copy">
+												{previewSurfaceAvailable()
+													? studioText().dropHere
+													: pipelineMode() === 'limited' || pipelineMode() === 'blocked'
+														? (limitedIssue() ??
+															(compatibilityImportEnabled()
+																? studioText().stillCanImport
+																: studioText().browserMissingCapabilities))
+														: studioText().dropHere}
+											</p>
 									</div>
 									<label
 										class={cn(
@@ -5062,9 +5169,9 @@ export function App() {
 										)}
 										title={importHint() ?? undefined}
 									>
-										Import
-										<input
-											class="import-picker-overlay-input"
+{studioText().import}
+											<input
+												class="import-picker-overlay-input"
 											type="file"
 											accept={VIDEO_ACCEPT}
 											multiple
@@ -5090,17 +5197,17 @@ export function App() {
 											<button
 												type="button"
 												class="export-why-link"
-												onClick={() => openDocs('browser-limitations')}
-											>
-												Why is this browser limited?
-											</button>
+onClick={() => openDocs('browser-limitations')}
+												>
+													{studioText().whyBrowserLimited}
+												</button>
 										</Show>
 									</p>
 								</div>
 							</Show>
-							<Show when={importing()}>
-								<div class="preview-overlay">Importing…</div>
-							</Show>
+<Show when={importing()}>
+									<div class="preview-overlay">{studioText().importingOverlay}</div>
+								</Show>
 							<Show when={scopePanelAvailable()}>
 								<ScopePanel
 									scopeSab={scopeSab}
@@ -5110,17 +5217,19 @@ export function App() {
 								/>
 							</Show>
 						</section>
-						<div id="side-rail" class="side-rail" role="region" aria-label="Side panel">
+						<div id="side-rail" class="side-rail" role="region" aria-label={studioText().sidePanel}>
 							<Show
 								when={!sideRailCollapsed()}
 								fallback={
-									<button
-										id="side-rail-expand-btn"
-										class="side-rail-expand"
-										aria-label={`Expand ${sideRailTabLabel(activeSideRailTab())} panel`}
-										aria-expanded="false"
-										aria-controls="side-rail"
-										title={`Expand ${sideRailTabLabel(activeSideRailTab())}`}
+<button
+											id="side-rail-expand-btn"
+											class="side-rail-expand"
+											aria-label={studioText()
+												.expandPanel.replace('{name}', sideRailTabLabel(activeSideRailTab()))}
+											aria-expanded="false"
+											aria-controls="side-rail"
+											title={studioText()
+												.expandTitle.replace('{name}', sideRailTabLabel(activeSideRailTab()))}
 										onClick={() => toggleSideRail(false)}
 									>
 										<span class="side-rail-expand-label">
@@ -5141,7 +5250,7 @@ export function App() {
 										if (isSideRailTab(details.value)) setActiveSideRailTab(details.value);
 									}}
 								>
-									<Tabs.List class="side-rail-tab-bar" aria-label="Side panel tabs">
+									<Tabs.List class="side-rail-tab-bar" aria-label={studioText().sidePanelTabs}>
 										<For each={SIDE_RAIL_TABS}>
 											{(tab) => (
 												<Tabs.Trigger
@@ -5153,12 +5262,12 @@ export function App() {
 												</Tabs.Trigger>
 											)}
 										</For>
-										<button
-											class="side-rail-collapse"
-											aria-label="Collapse side panel"
-											aria-expanded="true"
-											aria-controls="side-rail"
-											title="Collapse side panel"
+<button
+												class="side-rail-collapse"
+												aria-label={studioText().collapseSidePanel}
+												aria-expanded="true"
+												aria-controls="side-rail"
+												title={studioText().collapseSidePanel}
 											onClick={() => toggleSideRail(true)}
 										>
 											<ChevronsRight size={16} aria-hidden="true" />
@@ -5448,13 +5557,16 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('text')}
 										>
-											<SecondaryRailTabs
-												idPrefix="text"
-												label="Text tools"
-												tabs={textSideRailTabs()}
-												value={activeTextSideRailTab()}
-												onSelect={openTextSideRailTab}
-											/>
+<SecondaryRailTabs
+													idPrefix="text"
+													label={studioText().textTools}
+													tabs={textSideRailTabs().map((tab) => ({
+														id: tab.id,
+														label: textSideRailTabLabel(tab.id)
+													}))}
+													value={activeTextSideRailTab()}
+													onSelect={openTextSideRailTab}
+												/>
 											<SecondaryRailPanel
 												idPrefix="text"
 												tab="captions"
@@ -5627,13 +5739,16 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('capture')}
 										>
-											<SecondaryRailTabs
-												idPrefix="capture"
-												label="Capture tools"
-												tabs={CAPTURE_SIDE_RAIL_TABS}
-												value={activeCaptureSideRailTab()}
-												onSelect={openCaptureSideRailTab}
-											/>
+<SecondaryRailTabs
+													idPrefix="capture"
+													label={studioText().captureTools}
+													tabs={CAPTURE_SIDE_RAIL_TABS.map((tab) => ({
+														id: tab.id,
+														label: captureSideRailTabLabel(tab.id)
+													}))}
+													value={activeCaptureSideRailTab()}
+													onSelect={openCaptureSideRailTab}
+												/>
 											<SecondaryRailPanel
 												idPrefix="capture"
 												tab="record"
@@ -5794,13 +5909,16 @@ export function App() {
 											class="side-rail-tab-panel"
 											aria-labelledby={sideRailTabTriggerId('audio')}
 										>
-											<SecondaryRailTabs
-												idPrefix="audio"
-												label="Audio tools"
-												tabs={AUDIO_SIDE_RAIL_TABS}
-												value={activeAudioSideRailTab()}
-												onSelect={openAudioSideRailTab}
-											/>
+<SecondaryRailTabs
+													idPrefix="audio"
+													label={studioText().audioTools}
+													tabs={AUDIO_SIDE_RAIL_TABS.map((tab) => ({
+														id: tab.id,
+														label: audioSideRailTabLabel(tab.id)
+													}))}
+													value={activeAudioSideRailTab()}
+													onSelect={openAudioSideRailTab}
+												/>
 											<SecondaryRailPanel
 												idPrefix="audio"
 												tab="live-chain"
@@ -6002,29 +6120,34 @@ export function App() {
 									type="button"
 									class="status-badge"
 									onClick={() => updateServiceWorker(true)}
-									title="Click to update app"
+									title={studioText().clickToUpdateApp}
 								>
-									Update Available
+									{studioText().updateAvailable}
 								</button>
 							</Show>
 							<Show when={(offlineReady() || hasActiveSW()) && !isOffline()}>
-								<span class="status-badge" title="App ready to work offline">
-									Ready Offline
+								<span class="status-badge" title={studioText().appReadyOffline}>
+									{studioText().readyOffline}
 								</span>
 							</Show>
 							<Show when={isOffline()}>
-								<span class="status-badge status-warn" title="No internet connection">
-									Offline
+								<span class="status-badge status-warn" title={studioText().noInternetConnection}>
+									{studioText().offlineBadge}
 								</span>
 							</Show>
 							<Show when={workerRecoveryState() !== 'running'}>
-								<span class="status-badge status-warn" title={`Worker: ${workerRecoveryState()}`}>
-									{workerRecoveryState() === 'throttled' ? 'Worker Failed' : 'Worker Recovering'}
+								<span
+									class="status-badge status-warn"
+									title={studioText().workerState.replace('{state}', workerRecoveryState())}
+								>
+									{workerRecoveryState() === 'throttled'
+										? studioText().workerFailed
+										: studioText().workerRecovering}
 								</span>
 							</Show>
 							<Show when={audioWarning()}>
 								<span class="status-badge status-warn" title={audioWarning()!}>
-									Audio Disabled
+									{studioText().audioDisabledShort}
 								</span>
 							</Show>
 							<Show when={capabilityTierV2Label(capabilityProbeV2())}>
@@ -6046,9 +6169,17 @@ export function App() {
 								type="button"
 								class="status-badge"
 								onClick={openDiagnostics}
-								title="Open diagnostics"
+								title={studioText().openDiagnosticsTitle}
 							>
-								Diagnostics
+								{studioText().diagnostics}
+							</button>
+							<button
+								type="button"
+								class="status-badge"
+								onClick={openStorageCleanup}
+								title={studioText().storageCleanupActionTitle}
+							>
+								{studioText().storageCleanup}
 							</button>
 							<Show when={isIsolated()}>
 								<span class="status-ok">COOP/COEP OK</span>
@@ -6253,11 +6384,14 @@ export function App() {
 												);
 												setAudioWarning(null);
 											},
-											(err) => {
-												setAudioWarning(
-													`Audio disabled: ${err instanceof Error ? err.message : String(err)}`
-												);
-											}
+(err) => {
+													setAudioWarning(
+														studioText().audioDisabled.replace(
+															'{message}',
+															err instanceof Error ? err.message : String(err)
+														)
+													);
+												}
 										);
 									}
 									break;
@@ -6266,6 +6400,12 @@ export function App() {
 									break;
 							}
 						}}
+					/>
+					<StorageCleanupDialog
+						open={storageDialogOpen()}
+						report={storageReport()}
+						onRefresh={() => void refreshStorageReport()}
+						onClose={() => setStorageDialogOpen(false)}
 					/>
 				</AppErrorBoundary>
 			</div>

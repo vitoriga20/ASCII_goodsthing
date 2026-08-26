@@ -8,6 +8,7 @@
  */
 
 import { Show, onCleanup, onMount } from 'solid-js';
+import { studioCopy, studioLocale } from './locale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +42,7 @@ function formatElapsed(elapsedUs: number): string {
 // ---------------------------------------------------------------------------
 
 export function ProgramMonitor(props: ProgramMonitorProps) {
+	const copy = () => studioCopy(studioLocale());
 	let containerRef: HTMLDivElement | undefined;
 
 	onMount(() => {
@@ -63,7 +65,7 @@ export function ProgramMonitor(props: ProgramMonitorProps) {
 			<div
 				class="program-monitor"
 				role="region"
-				aria-label="Program output preview"
+				aria-label={copy().programOutputPreview}
 				ref={(el) => (containerRef = el)}
 			>
 				<div class="program-monitor-overlay" aria-live="polite">

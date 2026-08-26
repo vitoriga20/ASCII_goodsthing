@@ -15,6 +15,7 @@ import {
 import { parseEventsSidecar } from '../engine/capture/events-sidecar';
 import { parseDomEventLog, type DomEventLogEntry } from '../engine/dom-event-log';
 import type { ClipKeyframesSnapshot, SessionEventLogRef } from '../protocol';
+import { studioCopy, studioLocale } from './locale';
 
 interface AutoZoomPanelProps {
 	clipId: string;
@@ -69,6 +70,7 @@ function parseLoadedEvents(
 }
 
 export function AutoZoomPanel(props: AutoZoomPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [entries, setEntries] = createSignal<DomEventLogEntry[]>([]);
 	const [proposals, setProposals] = createSignal<ZoomProposal[]>([]);
 	const [loading, setLoading] = createSignal(false);
@@ -104,10 +106,10 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 					setEntries(parsed);
 					setProposals(clusterEvents(parsed, params(), props.clipStartUs ?? 0));
 				} else {
-					setError('Invalid event log format');
+					setError(copy().invalidEventLog);
 				}
 			} catch {
-				setError('No event log available for this clip.');
+				setError(copy().noEventLog);
 			} finally {
 				setLoading(false);
 			}
@@ -138,17 +140,15 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 
 	return (
 		<section class="inspector-section">
-			<h3>Auto-Zoom</h3>
+			<h3>{copy().autoZoom}</h3>
 
 			<Show when={!props.sessionEventLogRef}>
-				<p class="placeholder-text">
-					No event log available for this clip. Event logs are recorded only for own-tab captures.
-				</p>
+				<p class="placeholder-text">{copy().noEventLogHint}</p>
 			</Show>
 
 			<Show when={props.sessionEventLogRef}>
 				<Show when={loading()}>
-					<p class="loading-text">Loading event log…</p>
+					<p class="loading-text">{copy().loadingEventLog}</p>
 				</Show>
 
 				<Show when={error()}>
@@ -158,7 +158,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 				<Show when={!loading() && !error() && entries().length > 0}>
 					<div class="autozoom-params">
 						<label>
-							Window (s)
+							{copy().windowS}
 							<input
 								type="number"
 								value={params().clusterWindowS}
@@ -171,7 +171,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Distance
+							{copy().distance}
 							<input
 								type="number"
 								value={params().clusterDistanceNorm}
@@ -184,7 +184,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Scale
+							{copy().scale}
 							<input
 								type="number"
 								value={params().zoomScale}
@@ -197,7 +197,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Lead-in (ms)
+							{copy().leadInMs}
 							<input
 								type="number"
 								value={params().leadInMs}
@@ -210,7 +210,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Ramp (ms)
+							{copy().rampMs}
 							<input
 								type="number"
 								value={params().rampMs}
@@ -221,7 +221,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Hold (ms)
+							{copy().holdMs}
 							<input
 								type="number"
 								value={params().holdMs}
@@ -232,7 +232,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 							/>
 						</label>
 						<label>
-							Merge (ms)
+							{copy().mergeMs}
 							<input
 								type="number"
 								value={params().overlapMergeThresholdMs}
@@ -252,10 +252,10 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 					<button
 						type="button"
 						class="recluster-btn"
-						aria-label="Re-cluster proposals"
+						aria-label={copy().recluster}
 						onClick={handleRecluster}
 					>
-						Re-cluster
+						{copy().recluster}
 					</button>
 
 					<div class="proposal-list">
@@ -267,18 +267,20 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 										{(proposal().centroidX * 100).toFixed(0)}% ×{' '}
 										{(proposal().centroidY * 100).toFixed(0)}%
 									</span>
-									<span class="proposal-count">{proposal().cluster.eventCount} events</span>
+									<span class="proposal-count">
+										{copy().eventsCount.replace('{n}', String(proposal().cluster.eventCount))}
+									</span>
 									<button
 										type="button"
 										onClick={() => handleApply(proposal())}
 										disabled={proposal().status === 'applied'}
 										aria-label={
 											proposal().status === 'applied'
-												? `Applied proposal ${index + 1}`
-												: `Apply proposal ${index + 1}`
+												? copy().appliedProposal.replace('{n}', String(index + 1))
+												: copy().applyProposal.replace('{n}', String(index + 1))
 										}
 									>
-										{proposal().status === 'applied' ? 'Applied' : 'Apply'}
+										{proposal().status === 'applied' ? copy().applied : copy().apply}
 									</button>
 									<button
 										type="button"
@@ -286,11 +288,11 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 										aria-pressed={proposal().status === 'skipped'}
 										aria-label={
 											proposal().status === 'skipped'
-												? `Unskip proposal ${index + 1}`
-												: `Skip proposal ${index + 1}`
+												? copy().unskipProposal.replace('{n}', String(index + 1))
+												: copy().skipProposal.replace('{n}', String(index + 1))
 										}
 									>
-										{proposal().status === 'skipped' ? 'Unskip' : 'Skip'}
+										{proposal().status === 'skipped' ? copy().unskip : copy().skip}
 									</button>
 								</div>
 							)}
@@ -299,7 +301,7 @@ export function AutoZoomPanel(props: AutoZoomPanelProps) {
 				</Show>
 
 				<Show when={!loading() && !error() && entries().length === 0}>
-					<p class="placeholder-text">No events recorded in this session.</p>
+					<p class="placeholder-text">{copy().noEvents}</p>
 				</Show>
 			</Show>
 		</section>

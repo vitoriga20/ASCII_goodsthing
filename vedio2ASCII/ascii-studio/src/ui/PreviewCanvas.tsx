@@ -1,4 +1,5 @@
 import { onMount } from 'solid-js';
+import { studioCopy, studioLocale } from './locale';
 
 interface PreviewCanvasProps {
 	onOffscreenReady: (canvas: OffscreenCanvas) => void;
@@ -8,6 +9,7 @@ interface PreviewCanvasProps {
 }
 
 export function PreviewCanvas(props: PreviewCanvasProps) {
+	const copy = () => studioCopy(studioLocale());
 	let canvasEl: HTMLCanvasElement | undefined;
 
 	onMount(() => {
@@ -23,7 +25,7 @@ export function PreviewCanvas(props: PreviewCanvasProps) {
 			class="preview-canvas"
 			width={1280}
 			height={720}
-			aria-label="Video preview"
+			aria-label={copy().videoPreview}
 		/>
 	);
 }

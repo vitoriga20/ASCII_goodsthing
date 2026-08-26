@@ -17,6 +17,7 @@ import {
 } from '../engine/publish-settings';
 import { savePublishSettings } from '../engine/persistence';
 import { livePublishAvailable } from '../engine/capability-probe-v2';
+import { studioCopy, studioLocale } from './locale';
 import type { PublishTapStats } from './publish-controller';
 
 interface PublishPanelProps {
@@ -45,22 +46,24 @@ const ENDPOINT_TYPES: readonly PublishEndpointType[] = [
 	'custom'
 ];
 
-function failureMessage(reason: PublishFailureReason): string {
+type Copy = ReturnType<typeof studioCopy>;
+
+function failureMessage(reason: PublishFailureReason, copy: Copy): string {
 	switch (reason) {
 		case 'rejected-offer':
-			return 'The endpoint rejected the stream format (HTTP 400).';
+			return copy.failureRejectedOffer;
 		case 'auth':
-			return 'The endpoint rejected the token — check your stream key.';
+			return copy.failureAuth;
 		case 'not-found':
-			return 'Endpoint URL not found — check the WHIP URL.';
+			return copy.failureNotFound;
 		case 'gave-up':
-			return 'Reconnect attempts exhausted — check your network and go live again.';
+			return copy.failureGaveUp;
 		case 'budget-exhausted':
-			return 'The encoder budget on this device is in use (export or recording in progress).';
+			return copy.failureBudgetExhausted;
 		case 'unsupported':
-			return 'Live publish is not supported in this browser.';
+			return copy.failureUnsupported;
 		case 'local-error':
-			return 'Publishing stopped because of a local error.';
+			return copy.failureLocalError;
 	}
 }
 
@@ -68,24 +71,25 @@ function formatRtt(rttMs: number | null): string {
 	return rttMs === null ? '—' : `${Math.round(rttMs)} ms`;
 }
 
-function stateLabel(state: PublishState): string {
+function stateLabel(state: PublishState, copy: Copy): string {
 	switch (state.phase) {
 		case 'idle':
-			return 'Not streaming';
+			return copy.stateNotStreaming;
 		case 'connecting':
-			return 'Connecting…';
+			return copy.stateConnecting;
 		case 'live':
-			return 'Live';
+			return copy.stateLive;
 		case 'reconnecting':
-			return `Reconnecting (attempt ${state.attempt})`;
+			return copy.stateReconnecting.replace('{n}', String(state.attempt));
 		case 'ended':
-			return 'Stream ended';
+			return copy.stateStreamEnded;
 		case 'failed':
-			return 'Stream failed';
+			return copy.stateStreamFailed;
 	}
 }
 
 export function PublishPanel(props: PublishPanelProps) {
+	const copy = () => studioCopy(studioLocale());
 	const [retryRemainingS, setRetryRemainingS] = createSignal<number | null>(null);
 	let panelRef: HTMLElement | undefined;
 	const embedded = () => props.mode === 'embedded';
@@ -160,14 +164,14 @@ export function PublishPanel(props: PublishPanelProps) {
 
 	const statusDetail = createMemo<string | null>(() => {
 		const state = props.state;
-		if (state.phase === 'failed') return failureMessage(state.reason);
+		if (state.phase === 'failed') return failureMessage(state.reason, copy());
 		if (state.phase === 'reconnecting') {
 			const remaining = retryRemainingS();
 			return remaining !== null && remaining > 0
-				? `Next retry in ${remaining}s — playback continues locally.`
-				: 'Retrying now — playback continues locally.';
+				? copy().nextRetryIn.replace('{n}', String(remaining))
+				: copy().retryingNow;
 		}
-		if (state.phase === 'connecting') return 'Sending the offer to the WHIP endpoint…';
+		if (state.phase === 'connecting') return copy().sendingOffer;
 		return null;
 	});
 
@@ -217,17 +221,17 @@ export function PublishPanel(props: PublishPanelProps) {
 					<div>
 						<p class="panel-title" id="publish-panel-title">
 							<Radio size={14} aria-hidden="true" />
-							Go Live (WHIP)
+							{copy().goLiveWhip}
 						</p>
-						<p class="publish-panel-sub">Stream the program output to a WHIP ingest endpoint.</p>
+						<p class="publish-panel-sub">{copy().publishSub}</p>
 					</div>
 					<Show when={!embedded()}>
 						<Button
 							size="icon"
 							variant="ghost"
 							onClick={props.onClose}
-							aria-label="Close publish panel"
-							title="Close publish panel"
+							aria-label={copy().closePublishPanel}
+							title={copy().closePublishPanel}
 						>
 							<X size={16} aria-hidden="true" />
 						</Button>
@@ -241,7 +245,7 @@ export function PublishPanel(props: PublishPanelProps) {
 					aria-live="polite"
 					aria-atomic="true"
 				>
-					<p class="publish-status-label">{stateLabel(props.state)}</p>
+					<p class="publish-status-label">{stateLabel(props.state, copy())}</p>
 					<Show when={statusDetail()}>
 						{(detail) => <p class="publish-status-detail">{detail()}</p>}
 					</Show>
@@ -249,21 +253,21 @@ export function PublishPanel(props: PublishPanelProps) {
 						{(live) => (
 							<dl class="publish-stats">
 								<div>
-									<dt>Bitrate</dt>
+									<dt>{copy().publishBitrate}</dt>
 									<dd class="tabular-nums">
 										{live().stats.bitrateKbps} / {settings().videoBitrateKbps} kbps
 									</dd>
 								</div>
 								<div>
-									<dt>RTT</dt>
+									<dt>{copy().rtt}</dt>
 									<dd class="tabular-nums">{formatRtt(live().stats.rttMs)}</dd>
 								</div>
 								<div>
-									<dt>Frames sent</dt>
+									<dt>{copy().framesSent}</dt>
 									<dd class="tabular-nums">{live().stats.framesSent}</dd>
 								</div>
 								<div>
-									<dt>Frames dropped</dt>
+									<dt>{copy().framesDropped}</dt>
 									<dd class="tabular-nums">
 										{props.tapStats?.framesDropped ?? live().stats.framesDropped}
 									</dd>
@@ -282,21 +286,19 @@ export function PublishPanel(props: PublishPanelProps) {
 						<div class="publish-unavailable">
 							<p class="export-note">
 								{props.probe === null
-									? 'Checking browser capabilities…'
-									: 'Live publish is unavailable in this browser tier. Editing, preview, and export keep working — streaming simply stays hidden rather than failing mid-broadcast.'}
+									? copy().checkingCapabilities
+									: copy().publishUnavailableTier}
 							</p>
 							<Show when={props.probe !== null}>
 								<ul class="publish-missing-list">
 									<Show when={props.probe!.livePublish.rtcPeerConnection !== 'supported'}>
-										<li>WebRTC (RTCPeerConnection) is not exposed here.</li>
+										<li>{copy().rtcNotExposed}</li>
 									</Show>
 									<Show when={props.probe!.livePublish.trackGeneratorWorker !== 'supported'}>
-										<li>Insertable media streams (MediaStreamTrackGenerator) are unavailable.</li>
+										<li>{copy().insertableStreamsUnavailable}</li>
 									</Show>
 								</ul>
-								<p class="export-note">
-									A current Chromium-based desktop browser (Chrome or Edge) provides both.
-								</p>
+								<p class="export-note">{copy().chromiumRequired}</p>
 							</Show>
 						</div>
 					}
@@ -308,9 +310,9 @@ export function PublishPanel(props: PublishPanelProps) {
 							if (!busy() && urlValid()) goLive();
 						}}
 					>
-						<p class="export-eyebrow">Destination</p>
+						<p class="export-eyebrow">{copy().publishDestination}</p>
 						<label class="export-field publish-field-wide">
-							<span>Endpoint type</span>
+							<span>{copy().endpointType}</span>
 							<select
 								class="export-select"
 								value={settings().endpointType}
@@ -323,7 +325,7 @@ export function PublishPanel(props: PublishPanelProps) {
 							</select>
 						</label>
 						<label class="export-field publish-field-wide">
-							<span>WHIP endpoint URL</span>
+							<span>{copy().whipEndpointUrl}</span>
 							<input
 								type="url"
 								value={settings().endpointUrl}
@@ -333,10 +335,10 @@ export function PublishPanel(props: PublishPanelProps) {
 							/>
 						</label>
 						<Show when={settings().endpointUrl !== '' && !urlValid()}>
-							<p class="export-error">Enter a full http(s) WHIP URL.</p>
+							<p class="export-error">{copy().invalidWhipUrl}</p>
 						</Show>
 						<label class="export-field publish-field-wide">
-							<span>Bearer token (stream key)</span>
+							<span>{copy().bearerToken}</span>
 							<input
 								type="password"
 								autocomplete="off"
@@ -352,17 +354,14 @@ export function PublishPanel(props: PublishPanelProps) {
 								disabled={busy()}
 								onChange={(e) => update({ rememberToken: e.currentTarget.checked })}
 							/>
-							<span>Remember token on this device</span>
+							<span>{copy().rememberToken}</span>
 						</label>
-						<p class="export-note publish-token-note">
-							The token is kept for this session only unless remembered. Remembered tokens are
-							stored unencrypted in this browser profile, like OBS stores stream keys.
-						</p>
+						<p class="export-note publish-token-note">{copy().tokenSessionOnly}</p>
 
-						<p class="export-eyebrow">Encoding</p>
+						<p class="export-eyebrow">{copy().publishEncoding}</p>
 						<div class="export-fields">
 							<label class="export-field">
-								<span>Video codec</span>
+								<span>{copy().videoCodec}</span>
 								<select
 									class="export-select"
 									value={effectiveCodec(settings(), props.probe?.codecs.av1Encode === 'supported')}
@@ -371,14 +370,14 @@ export function PublishPanel(props: PublishPanelProps) {
 										update({ codec: e.currentTarget.value === 'av1' ? 'av1' : 'h264' })
 									}
 								>
-									<option value="h264">H.264 (default)</option>
+									<option value="h264">{copy().h264Default}</option>
 									<option value="av1" disabled={!av1Available()}>
-										AV1 (endpoint-dependent)
+										{copy().av1EndpointDependent}
 									</option>
 								</select>
 							</label>
 							<label class="export-field">
-								<span>Bitrate (kbps, max {guidance().maxBitrateKbps})</span>
+								<span>{copy().bitrateKbpsMax.replace('{n}', String(guidance().maxBitrateKbps))}</span>
 								<input
 									type="number"
 									min="500"
@@ -391,34 +390,32 @@ export function PublishPanel(props: PublishPanelProps) {
 									}
 								/>
 							</label>
-							<Show
-								when={keyframeControlAvailable()}
-								fallback={
-									<div class="export-field">
-										<span>Keyframe interval</span>
-										<p class="publish-static-value">
-											Platform default GOP (keyframe control unavailable in this browser)
-										</p>
-									</div>
+						<Show
+							when={keyframeControlAvailable()}
+							fallback={
+								<div class="export-field">
+									<span>{copy().keyframeInterval}</span>
+									<p class="publish-static-value">{copy().platformDefaultGop}</p>
+								</div>
+							}
+						>
+						<label class="export-field">
+							<span>{copy().keyframeIntervalS}</span>
+							<input
+								type="number"
+								min="1"
+								max="10"
+								step="1"
+								value={settings().keyframeIntervalS}
+								disabled={busy()}
+								onChange={(e) =>
+									update({ keyframeIntervalS: Number(e.currentTarget.value) || 2 })
 								}
-							>
-								<label class="export-field">
-									<span>Keyframe interval (s)</span>
-									<input
-										type="number"
-										min="1"
-										max="10"
-										step="1"
-										value={settings().keyframeIntervalS}
-										disabled={busy()}
-										onChange={(e) =>
-											update({ keyframeIntervalS: Number(e.currentTarget.value) || 2 })
-										}
-									/>
-								</label>
-							</Show>
+							/>
+						</label>
+						</Show>
 							<label class="export-field">
-								<span>Resolution cap</span>
+								<span>{copy().resolutionCap}</span>
 								<select
 									class="export-select"
 									value={settings().maxHeight === null ? 'none' : String(settings().maxHeight)}
@@ -432,11 +429,11 @@ export function PublishPanel(props: PublishPanelProps) {
 								>
 									<option value="1080">1080p</option>
 									<option value="720">720p</option>
-									<option value="none">Program resolution</option>
+									<option value="none">{copy().programResolution}</option>
 								</select>
 							</label>
 							<label class="export-field">
-								<span>Frame-rate cap</span>
+								<span>{copy().frameRateCap}</span>
 								<select
 									class="export-select"
 									value={settings().maxFps === null ? 'none' : String(settings().maxFps)}
@@ -450,15 +447,12 @@ export function PublishPanel(props: PublishPanelProps) {
 								>
 									<option value="30">30 fps</option>
 									<option value="60">60 fps</option>
-									<option value="none">Program rate</option>
+									<option value="none">{copy().programRate}</option>
 								</select>
 							</label>
 						</div>
 						<Show when={!props.recordWhileStreamingAvailable}>
-							<p class="export-note">
-								The hardware encoder budget allows one session on this device — recording or
-								exporting while streaming is unavailable.
-							</p>
+							<p class="export-note">{copy().encoderBudgetOneSession}</p>
 						</Show>
 
 						<div class="publish-actions">
@@ -471,29 +465,24 @@ export function PublishPanel(props: PublishPanelProps) {
 										disabled={!urlValid() || !settingsLoaded()}
 									>
 										<Radio size={14} aria-hidden="true" />
-										Go Live
+										{copy().goLive}
 									</Button>
 								}
 							>
 								<Button type="button" onClick={() => props.onStop()}>
 									<Square size={14} aria-hidden="true" />
-									Stop streaming
+									{copy().stopStreaming}
 								</Button>
 							</Show>
 						</div>
 					</form>
 				</Show>
 
-				<section class="publish-rtmp-note" aria-label="RTMP platforms">
-					<p class="export-eyebrow">RTMP-only platforms</p>
-					<p class="export-note">
-						YouTube, Douyin, and Bilibili only accept RTMP ingest, which browsers cannot speak. To
-						stream there, run your own WHIP→RTMP gateway such as MediaMTX and point this panel at
-						its WHIP endpoint. LocalCut talks directly to the endpoint you configure and never
-						operates relay infrastructure.
-					</p>
+				<section class="publish-rtmp-note" aria-label={copy().rtmpPlatforms}>
+					<p class="export-eyebrow">{copy().rtmpOnlyPlatforms}</p>
+					<p class="export-note">{copy().rtmpOnlyBody}</p>
 					<button type="button" class="export-why-link" onClick={() => props.onOpenGuide()}>
-						Open the Live Streaming guide
+						{copy().openLiveStreamingGuide}
 					</button>
 				</section>
 			</aside>

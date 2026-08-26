@@ -1836,6 +1836,12 @@ export class PreviewRenderer {
 		this.present(layers, renderTimeS);
 		console.log('[export-debug] renderLayeredForExport: present done, awaiting work-done...');
 		await this.device.queue.onSubmittedWorkDone();
+		// The canvas presents submitted frames at the compositor's vsync, not at
+		// submit time. Capturing immediately after work-done can read the previous
+		// presented buffer and duplicate the last frame — at slow export rates that
+		// shows up as flashing (frame hashes confirmed DUP patterns). Wait one
+		// vsync so the freshly rendered buffer is the presented one.
+		await new Promise((resolve) => setTimeout(resolve, 33));
 		const frame = this.captureCanvasFrame(timestamp, duration);
 		console.log('[export-debug] renderLayeredForExport: frame captured', {
 			w: frame.displayWidth,

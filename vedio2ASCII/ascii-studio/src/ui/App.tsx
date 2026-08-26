@@ -917,18 +917,6 @@ export function App() {
 		onState: (state) => setLivePreviewHud((current) => ({ ...current, ...state }))
 	});
 
-	// While an export runs, pause the live-preview source so it neither churns
-	// dropped frames nor drifts away from the playhead (the worker additionally
-	// drops live frames until export completes). When it ends, re-anchor to the
-	// playhead so resuming playback stays in sync.
-	createEffect(() => {
-		if (exporting()) {
-			void livePreviewDriver.setPlaying(false);
-		} else if (livePreviewEnabled() && livePreviewFile) {
-			void livePreviewDriver.seek(clock.currentTime());
-		}
-	});
-
 	async function toggleLivePreview(): Promise<void> {
 		if (livePreviewEnabled()) {
 			livePreviewDriver.stop();
@@ -956,6 +944,29 @@ export function App() {
 				lastError: error instanceof Error ? error.message : String(error)
 			}));
 		}
+	}
+
+	// Export lifecycle for the live channel. These are driven by export messages
+	// (not a reactive effect) on purpose: the clock signal updates every frame,
+	// so an effect reading it would seek on every tick while playing.
+	function pauseLivePreviewForExport(): void {
+		if (!livePreviewEnabled()) return;
+		void livePreviewDriver.setPlaying(false);
+	}
+
+	function reanchorLivePreviewAfterExport(): void {
+		if (!livePreviewEnabled() || !livePreviewFile) return;
+		void livePreviewDriver.seek(clock.currentTime());
+	}
+
+	// A new import replaces the live channel's hidden video: restart the driver
+	// with the fresh file so the ASCII monitor stops rendering the old source.
+	async function restartLivePreviewForImport(): Promise<void> {
+		if (!livePreviewFile || !bridge) return;
+		const time = clock.currentTime();
+		const playing = clock.playing();
+		livePreviewDriver.stop();
+		await livePreviewDriver.start('live-preview', livePreviewFile, time, playing);
 	}
 	let initSent = false;
 	let pendingInitCanvas: OffscreenCanvas | null = null;
@@ -2848,6 +2859,7 @@ export function App() {
 				break;
 			case 'export-progress':
 				setExporting(true);
+				pauseLivePreviewForExport();
 				setExportError(null);
 				setExportResult(null);
 				setExportProgress(msg.progress);
@@ -2861,6 +2873,7 @@ export function App() {
 				setExportError(null);
 				setExportResult(`Exported ${msg.fileName}`);
 				setStatusLine(`Export complete · ${msg.mimeType}`);
+				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-download-ready': {
 				downloadBlob(msg.blob, msg.fileName);
@@ -2869,6 +2882,7 @@ export function App() {
 				setExportError(null);
 				setExportResult(`Exported ${msg.fileName}`);
 				setStatusLine(`Export ready · ${msg.mimeType}`);
+				reanchorLivePreviewAfterExport();
 				break;
 			}
 			case 'export-warning':
@@ -2882,6 +2896,7 @@ export function App() {
 				setExportWarnings([]);
 				setExportResult('Export canceled');
 				setStatusLine('Export canceled');
+				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-error':
 				setExporting(false);
@@ -2890,6 +2905,7 @@ export function App() {
 				setExportError(msg.message);
 				setExportWarnings([]);
 				setStatusLine(`Export failed: ${msg.message}`);
+				reanchorLivePreviewAfterExport();
 				break;
 			case 'presets-state':
 				setExportPresets(msg.presets);
@@ -2919,6 +2935,7 @@ export function App() {
 				setStatusLine(
 					`Queue done: ${msg.completedCount} completed, ${msg.failedCount} failed, ${msg.canceledCount} canceled`
 				);
+				reanchorLivePreviewAfterExport();
 				break;
 			case 'diagnostic-snapshot': {
 				setRecentErrorLog((prev) => {
@@ -3502,6 +3519,12 @@ export function App() {
 
 	function importMedia(file: File, fileHandle?: FileSystemFileHandle | null) {
 		livePreviewFile = file;
+		if (livePreviewEnabled()) {
+			// The live channel owns its hidden video + object URL from start(); a
+			// new import must reload it or the ASCII monitor keeps rendering the
+			// previous file.
+			void restartLivePreviewForImport();
+		}
 		discardRestoreBeforeImport();
 		setSourcePreview(file);
 		if (previewSurfaceAvailable()) {

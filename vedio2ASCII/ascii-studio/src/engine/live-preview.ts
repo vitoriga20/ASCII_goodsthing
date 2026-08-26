@@ -87,7 +87,13 @@ export class LivePreviewDriver {
 		// next capture starts a fresh in-flight slot.
 		this.state = createLivePreviewBackpressureState(this.sourceId);
 		this.sequence = 0;
-		this.schedule();
+		if (this.video.paused) {
+			// Paused seek: present exactly one frame so the ASCII monitor follows
+			// the playhead; the continuous schedule() loop only runs while playing.
+			void this.capture(this.video.currentTime, true);
+		} else {
+			this.schedule();
+		}
 	}
 
 	async setPlaying(playing: boolean): Promise<void> {
@@ -151,10 +157,12 @@ export class LivePreviewDriver {
 		}
 	}
 
-	private async capture(mediaTimeS: number): Promise<void> {
-		if (!this.sourceId || this.video.paused || this.video.ended) return;
+	private async capture(mediaTimeS: number, force = false): Promise<void> {
+		if (!this.sourceId || this.video.ended) return;
+		if (!force && this.video.paused) return;
 		this.lastMediaTimeS = mediaTimeS;
-		this.sourceRate.record(performance.now());
+		// A forced capture is a one-shot paused seek, not a frame-rate sample.
+		if (!force) this.sourceRate.record(performance.now());
 		let frame: LivePreviewFrame;
 		try {
 			frame =

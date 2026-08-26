@@ -1262,9 +1262,14 @@ async function encodeVideoRange(
 						for (let i = 0; i < view.length; i += step) hash = ((hash * 31) | 0) + view[i];
 						hash = hash >>> 0;
 						const dup = frameHashPrev !== null && hash === frameHashPrev ? ' DUP<-' : '';
+						const srcFrame = layers.find((l) => l.kind === 'frame') as { frame?: VideoFrame } | undefined;
 						console.log(
 							'[export-debug] frame ' + frameIndex + ' hash=' + hash.toString(16) + dup,
-							{ w: exportFrame.displayWidth, h: exportFrame.displayHeight }
+							{
+								w: exportFrame.displayWidth,
+								h: exportFrame.displayHeight,
+								srcTsUs: srcFrame?.frame?.timestamp ?? 'black'
+							}
 						);
 						frameHashPrev = hash;
 					} catch (error) {

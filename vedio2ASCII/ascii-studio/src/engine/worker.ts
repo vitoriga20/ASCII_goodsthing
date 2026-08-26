@@ -1311,7 +1311,12 @@ async function handleLivePreviewFrame(
 			input instanceof VideoFrame
 				? input
 				: new VideoFrame(input, { timestamp: Math.round(cmd.mediaTimeS * 1e6) });
-		if (!renderer || livePreviewSourceId !== cmd.sourceId) {
+		// While a single export or a queue run is active, the compositor is busy
+		// rendering export frames into the export canvas; live frames must not
+		// interleave with the shared scratch textures. Drop them (still acked so
+		// the driver's backpressure never stalls); the driver resumes on the next
+		// seek/play after the run completes.
+		if (exportAbort || queueJobAbort || !renderer || livePreviewSourceId !== cmd.sourceId) {
 			livePreviewDropped += 1;
 			return;
 		}

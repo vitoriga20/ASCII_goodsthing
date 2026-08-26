@@ -917,6 +917,18 @@ export function App() {
 		onState: (state) => setLivePreviewHud((current) => ({ ...current, ...state }))
 	});
 
+	// While an export runs, pause the live-preview source so it neither churns
+	// dropped frames nor drifts away from the playhead (the worker additionally
+	// drops live frames until export completes). When it ends, re-anchor to the
+	// playhead so resuming playback stays in sync.
+	createEffect(() => {
+		if (exporting()) {
+			void livePreviewDriver.setPlaying(false);
+		} else if (livePreviewEnabled() && livePreviewFile) {
+			void livePreviewDriver.seek(clock.currentTime());
+		}
+	});
+
 	async function toggleLivePreview(): Promise<void> {
 		if (livePreviewEnabled()) {
 			livePreviewDriver.stop();

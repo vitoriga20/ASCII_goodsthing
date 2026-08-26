@@ -1035,16 +1035,6 @@ async function encodeVideoRange(
 		beautyLandmarksFor
 	} = options;
 	renderer.setPreviewSize(plan.width, plan.height);
-	console.log('[export-debug] encodeVideoRange: frames [' + startFrame + '..' + endFrame + '), total ' + plan.totalFrames, {
-		width: plan.width,
-		height: plan.height,
-		fps: plan.frameRate,
-		timelineSeconds: plan.exportDuration
-	});
-	// TEMP DEBUG: coarse content fingerprint of the first exported frames, to
-	// prove or rule out duplicate/alternating canvas captures.
-	let frameHashCount = 0;
-	let frameHashPrev: number | null = null;
 
 	const frameDuration = 1 / plan.frameRate;
 	let lastReport = 0;
@@ -1151,37 +1141,7 @@ async function encodeVideoRange(
 					const frameProvider = secondarySinkLayers.has(layer)
 						? secondarySinks.acquire(sourceHandle)
 						: sourceHandle.frameSource;
-					if (frameIndex === startFrame || frameIndex % 60 === 0) {
-						console.log(
-							'[export-debug]   decode frame ' + frameIndex + ': source=' + layer.clip.sourceId +
-								' ts=' + sourceTimestamp.adapterTimestampS.toFixed(6) +
-								' provider=' + (frameProvider ? 'yes' : 'none')
-						);
-					}
-					const decoded =
-					frameIndex === startFrame
-						? await Promise.race([
-								Promise.resolve(frameProvider?.frameAt(sourceTimestamp.adapterTimestampS)),
-								new Promise<never>((_resolve, reject) =>
-									setTimeout(
-										() =>
-											reject(
-												new Error(
-													'[export-debug] frameAt TIMEOUT after 20s (source=' +
-														layer.clip.sourceId +
-														', ts=' +
-														sourceTimestamp.adapterTimestampS.toFixed(6) +
-														')'
-												)
-											),
-										20000
-									)
-								)
-							])
-						: await frameProvider?.frameAt(sourceTimestamp.adapterTimestampS);
-					if (frameIndex === startFrame || frameIndex % 60 === 0) {
-						console.log('[export-debug]   decode frame ' + frameIndex + ' done:', decoded ? 'ok' : 'none');
-					}
+					const decoded = await frameProvider?.frameAt(sourceTimestamp.adapterTimestampS);
 					if (!decoded) continue;
 					decodedCount += 1;
 					let videoFrame: VideoFrame;
@@ -1251,37 +1211,6 @@ async function encodeVideoRange(
 					layers.length > 0
 						? await renderer.renderLayeredForExport(layers, outputTimestamp, duration, timelineTime)
 						: await renderer.renderBlackForExport(outputTimestamp, duration);
-				if (frameHashCount < 30) {
-					frameHashCount += 1;
-					try {
-						const bytes = new ArrayBuffer(exportFrame.allocationSize({ format: 'RGBA' }));
-						await exportFrame.copyTo(bytes, { format: 'RGBA' });
-						const view = new Uint8Array(bytes);
-						let hash = 0;
-						const step = Math.max(1, Math.floor(view.length / 8192));
-						for (let i = 0; i < view.length; i += step) hash = ((hash * 31) | 0) + view[i];
-						hash = hash >>> 0;
-						const dup = frameHashPrev !== null && hash === frameHashPrev ? ' DUP<-' : '';
-						const srcFrame = layers.find((l) => l.kind === 'frame') as { frame?: VideoFrame } | undefined;
-						console.log(
-							'[export-debug] frame ' + frameIndex + ' hash=' + hash.toString(16) + dup,
-							{
-								w: exportFrame.displayWidth,
-								h: exportFrame.displayHeight,
-								srcTsUs: srcFrame?.frame?.timestamp ?? 'black'
-							}
-						);
-						frameHashPrev = hash;
-					} catch (error) {
-						console.log('[export-debug] frame hash failed:', error instanceof Error ? error.message : error);
-					}
-				}
-				if (frameIndex === startFrame || frameIndex % 60 === 0) {
-					console.log(
-						'[export-debug] frame ' + frameIndex + ' rendered, layers=' + layers.length,
-						{ timelineTime }
-					);
-				}
 			} finally {
 				for (const frame of decodedFrames) frame.close();
 			}
@@ -1305,9 +1234,6 @@ async function encodeVideoRange(
 await videoSource
 			.add(sample, { keyFrame: frameIndex % keyFrameInterval === 0 })
 			.finally(() => sample.close());
-		if (frameIndex === startFrame || frameIndex % 60 === 0) {
-			console.log('[export-debug] frame ' + frameIndex + ' handed to encoder');
-		}
 
 			const now = performance.now();
 			if (now - lastReport > 250 || frameIndex === plan.totalFrames - 1) {
@@ -1431,16 +1357,6 @@ export async function exportTimeline(
 		options.settings,
 		options.throughputProbe
 	);
-	console.log('[export-debug] exportTimeline: plan', {
-		width: plan.width,
-		height: plan.height,
-		fps: plan.frameRate,
-		codec: plan.codec,
-		container: plan.container,
-		totalFrames: plan.totalFrames,
-		exportS: plan.exportDuration,
-		bitrate: plan.videoBitrate
-	});
 	throwIfCanceled(options.signal);
 	await assertVideoEncoderSupported(plan);
 	await assertAudioEncoderSupported(plan);
@@ -1490,11 +1406,9 @@ export async function exportTimeline(
 
 		const startedAt = performance.now();
 		options.onProgress(makeProgress(plan, 'video', 0, startedAt, options.throughputProbe));
-		console.log('[export-debug] exportTimeline: calling output.start()...');
+
 		await output.start();
-		console.log('[export-debug] exportTimeline: output.start() done, encoding...');
 		await encodeInterleaved(options, plan, videoSource, audioSource, startedAt);
-		console.log('[export-debug] exportTimeline: encodeInterleaved done, finalizing...');
 		videoSource.close();
 		videoSource = null;
 
@@ -1513,11 +1427,6 @@ export async function exportTimeline(
 		writable = null;
 		return { mimeType };
 	} catch (error) {
-		console.log(
-			'[export-debug] exportTimeline FAILED:',
-			error instanceof Error ? error.message : error,
-			error instanceof Error ? error.stack : ''
-		);
 		videoSource?.close();
 		audioSource?.close();
 		if (output) {

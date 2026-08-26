@@ -44,6 +44,8 @@ describe('backend readiness UI gating', () => {
 	it('shows the concrete backend label in the toolbar chip', () => {
 		expect(appSource).toContain('pipelineLabel={pipelineLabel()}');
 		expect(toolbarSource).toContain('pipelineLabel: string');
-		expect(toolbarSource).toContain('{props.pipelineLabel}');
+		// The zh-CN localization renders the chip label via a conditional on the
+		// prop rather than a bare JSX interpolation.
+		expect(toolbarSource).toContain('props.pipelineLabel ===');
 	});
 });

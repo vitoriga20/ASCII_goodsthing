@@ -147,6 +147,7 @@ vp run deploy
 - [`.kiro/specs/`](.kiro/specs/) preserves implementation history and design records; it is not the current product support list.
 - [`docs/RELEASE.md`](docs/RELEASE.md) is the detailed support boundary.
 - [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md) documents editor workflows.
+- [`docs/ASCII-STUDIO.md`](docs/ASCII-STUDIO.md) records the realtime-preview/export pitfalls of the ASCII workbench.
 
 ## License
 

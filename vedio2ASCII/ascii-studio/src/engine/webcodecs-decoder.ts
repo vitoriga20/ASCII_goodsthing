@@ -112,10 +112,10 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 				// Only a decoder stall (no output, no error) falls back to software;
 				// config/format errors are real and propagate immediately.
 				if (!(error instanceof VideoDecoderWedgeError)) throw error;
-				console.log(
-					'[export-debug] WebCodecs video decode wedged; retrying without hardware decode (' +
-						attempt.codec +
-						')'
+				// A decoder stall (no output, no error) is a real degradation worth
+				// surfacing: the stream was recovered by retrying on software decode.
+				console.warn(
+					'WebCodecs video decoder stalled; retrying without hardware decode (' + attempt.codec + ')'
 				);
 			}
 		}

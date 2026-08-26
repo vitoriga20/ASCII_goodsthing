@@ -2860,12 +2860,6 @@ export function App() {
 			case 'export-progress':
 				setExporting(true);
 				pauseLivePreviewForExport();
-				console.log(
-					'[export-debug] ui: export-progress',
-					msg.progress.doneFrames + '/' + msg.progress.totalFrames,
-					Math.round(msg.progress.percent * 100) + '%',
-					msg.progress.phase
-				);
 				setExportError(null);
 				setExportResult(null);
 				setExportProgress(msg.progress);
@@ -2874,7 +2868,6 @@ export function App() {
 				);
 				break;
 			case 'export-complete':
-				console.log('[export-debug] ui: export-complete', msg.fileName, msg.mimeType);
 				setExporting(false);
 				setExportProgress(null);
 				setExportError(null);
@@ -2883,7 +2876,6 @@ export function App() {
 				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-download-ready': {
-				console.log('[export-debug] ui: export-download-ready', msg.fileName, msg.mimeType, msg.blob.size + ' bytes');
 				downloadBlob(msg.blob, msg.fileName);
 				setExporting(false);
 				setExportProgress(null);
@@ -2898,7 +2890,6 @@ export function App() {
 				setStatusLine(`Export warning: ${msg.message}`);
 				break;
 			case 'export-canceled':
-				console.log('[export-debug] ui: export-canceled');
 				setExporting(false);
 				setExportProgress(null);
 				setExportError(null);
@@ -2908,7 +2899,6 @@ export function App() {
 				reanchorLivePreviewAfterExport();
 				break;
 			case 'export-error':
-				console.log('[export-debug] ui: export-error:', msg.message);
 				setExporting(false);
 				setExportProgress(null);
 				setExportResult(null);

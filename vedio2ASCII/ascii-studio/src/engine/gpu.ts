@@ -1832,9 +1832,17 @@ export class PreviewRenderer {
 		duration: number,
 		renderTimeS = timestamp / 1e6
 	): Promise<VideoFrame> {
+		console.log('[export-debug] renderLayeredForExport: present...', { layers: layers.length, timestamp });
 		this.present(layers, renderTimeS);
+		console.log('[export-debug] renderLayeredForExport: present done, awaiting work-done...');
 		await this.device.queue.onSubmittedWorkDone();
-		return this.captureCanvasFrame(timestamp, duration);
+		const frame = this.captureCanvasFrame(timestamp, duration);
+		console.log('[export-debug] renderLayeredForExport: frame captured', {
+			w: frame.displayWidth,
+			h: frame.displayHeight,
+			ts: frame.timestamp
+		});
+		return frame;
 	}
 
 	/** Emits a GPU-cleared black frame for gaps in the timeline (empty stack). */

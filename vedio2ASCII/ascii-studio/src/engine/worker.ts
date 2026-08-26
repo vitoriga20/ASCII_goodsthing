@@ -6491,6 +6491,12 @@ async function handleExportStart(cmd: Extract<WorkerCommand, { type: 'export-sta
 		return;
 	}
 
+	console.log(
+		'[export-debug] handleExportStart: backend=' +
+			(renderer ? 'webgpu' : reducedRenderer ? 'canvas2d' : 'none') +
+			', output=' +
+			(cmd.output ? 'yes' : 'no')
+	);
 	handlePause();
 	const controller = new AbortController();
 	exportAbort = controller;
@@ -6663,6 +6669,7 @@ async function handleExportStart(cmd: Extract<WorkerCommand, { type: 'export-sta
 			}
 		}
 	} catch (error) {
+		console.log('[export-debug] handleExportStart caught:', errorMessage(error), error instanceof Error ? error.stack : '');
 		if (error instanceof ExportCancelledError) {
 			post({ type: 'export-canceled' });
 		} else {

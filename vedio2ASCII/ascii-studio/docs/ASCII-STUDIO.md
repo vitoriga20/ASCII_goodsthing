@@ -41,6 +41,9 @@
 - 机器 ffmpeg/ffprobe 在 `C:\Users\vitoriga\Tools\ffmpeg\bin\`，用于音频剥离/重编码对照，定位"文件特性"类问题。
 - 帧指纹法：对导出帧做粗哈希 + 记录源帧时间戳，一次区分"解码喂帧重复"还是"画布回读重复"。
 - 用看门狗把"静默挂死"转成"带标题报错"，避免无限 0% 进度。
+- 格式化用 `vp fmt`（如 `pnpm exec vp fmt <file>`）；**不要裸敲 `pnpm fmt`**——Git Bash 里会命中 GNU coreutils 的 `fmt`（GNU 版），参数语义完全不同。检查用 `vp fmt --check <file>` 或 `vp run check:format`。
+- 无头浏览器/CI 里 `navigator.gpu.requestAdapter()` 通常是 null（SwiftShader、D3D11 各标志组合都拿不到）——WebGPU 校验错误只能靠「浏览器控制台 + `[ascii]`/uncapturederror 日志」或 `test:browser` 的 GPU 回归测试（无 GPU 自动跳过，有 GPU 机器/CI 真编译 shader 并读回像素）。
+- `createComputePipeline` 的失败在 Dawn 里可能是**异步 invalid**（不抛同步异常、try/catch 抓不到），要拿真实首错必须用 `device.pushErrorScope('validation')` 包住创建并 pop 取消息；对象再被使用（如 getBindGroupLayout）只报"invalid due to a previous error"这种没有因果的二错。
 ## 6. 字符集功能（自定义填充字符）
 
 - **能力**：右侧检查器新增「字符集」控件——5 个内置集（`01` 二进制、经典渐变、字母数字、矩阵风、纯符号）+ 自由输入框。字符集即填充码表：**首字符=最暗、尾字符=最亮**，任意字符都行（字母/数字/符号/空格/中文/emoji，系统等宽字体渲染）。

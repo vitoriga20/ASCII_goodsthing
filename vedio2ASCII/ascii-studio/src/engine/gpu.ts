@@ -383,10 +383,6 @@ export class PreviewRenderer {
 	private asciiTex: GPUTexture | null = null;
 	private asciiView: GPUTextureView | null = null;
 	private outConvView: GPUTextureView | null = null;
-	// Export-only present surface: export frames render here so they never race
-	// the live preview against the preview canvas (Phase 2 of the flicker fix).
-	private exportCanvas: OffscreenCanvas | null = null;
-	private exportContext: GPUCanvasContext | null = null;
 	// Phase 21: opacity scratch (dedicated texture to avoid aliasing with storage.c).
 	private opacityTex: GPUTexture | null = null;
 	private opacityView: GPUTextureView | null = null;
@@ -860,24 +856,6 @@ export class PreviewRenderer {
 			this.dispatchScopes(encoder, this._lastAccView);
 		}
 
-		this.encodePresent(encoder, presentView, this.context.getCurrentTexture().createView());
-
-		// Single submission per frame: clear → N×(import → grade → transform → composite) → present.
-		this.device.queue.submit([encoder.finish()]);
-		this.submissionCount = 1;
-	}
-
-	/**
-	 * Fullscreen-triangle present of `presentView` into `targetView` (the current
-	 * texture of the preview or export canvas). Preview and export share the draw
-	 * pipeline and the source-view bind-group cache; only the destination canvas
-	 * differs, so export never writes the preview surface.
-	 */
-	private encodePresent(
-		encoder: GPUCommandEncoder,
-		presentView: GPUTextureView,
-		targetView: GPUTextureView
-	): void {
 		if (presentView !== this.lastPresentView || !this.presentBindGroup) {
 			this.presentBindGroup = this.device.createBindGroup({
 				layout: this.presentPipeline.getBindGroupLayout(0),
@@ -892,7 +870,7 @@ export class PreviewRenderer {
 		const render = encoder.beginRenderPass({
 			colorAttachments: [
 				{
-					view: targetView,
+					view: this.context.getCurrentTexture().createView(),
 					loadOp: 'clear',
 					storeOp: 'store',
 					clearValue: { r: 0, g: 0, b: 0, a: 1 }
@@ -903,6 +881,10 @@ export class PreviewRenderer {
 		render.setBindGroup(0, this.presentBindGroup);
 		render.draw(3);
 		render.end();
+
+		// Single submission per frame: clear → N×(import → grade → transform → composite) → present.
+		this.device.queue.submit([encoder.finish()]);
+		this.submissionCount = 1;
 	}
 
 	/**
@@ -1838,12 +1820,11 @@ export class PreviewRenderer {
 	}
 
 	/**
-	 * Renders a layer stack through the same compositor as preview, but into the
-	 * dedicated export canvas, then captures that canvas as the frame handed to
-	 * the encoder. The live-preview channel and the export channel therefore never
-	 * race for the preview surface. `timestamp` is the WebCodecs timestamp in
-	 * microseconds, while `renderTimeS` is the grain seed in seconds; pass the
-	 * timeline time explicitly when those diverge (in/out range export).
+	 * Renders a layer stack through the same compositor as preview, then captures
+	 * the compositor-backed canvas as the frame handed to the encoder. `timestamp`
+	 * is the WebCodecs timestamp in microseconds, while `renderTimeS` is the
+	 * grain seed in seconds; pass the timeline time explicitly when those diverge
+	 * (in/out range export).
 	 */
 	async renderLayeredForExport(
 		layers: readonly CompositeLayer[],
@@ -1851,39 +1832,9 @@ export class PreviewRenderer {
 		duration: number,
 		renderTimeS = timestamp / 1e6
 	): Promise<VideoFrame> {
-		this.ensureExportSurface();
-		const encoder = this.device.createCommandEncoder();
-		const finalView = this.compositeLayers(encoder, layers, renderTimeS);
-		this.encodePresent(encoder, finalView, this.exportContext!.getCurrentTexture().createView());
-		this.device.queue.submit([encoder.finish()]);
-		this.submissionCount = 1;
+		this.present(layers, renderTimeS);
 		await this.device.queue.onSubmittedWorkDone();
-		return this.captureCanvasFrame(this.exportCanvas!, timestamp, duration);
-	}
-
-	/**
-	 * Lazy export-only WebGPU canvas sized to the current compositor resolution,
-	 * recreated only when the size changes. Its context lives on the same device
-	 * as the preview context, so export keeps the zero-copy GPU chain.
-	 */
-	private ensureExportSurface(): void {
-		if (
-			this.exportCanvas &&
-			this.exportContext &&
-			this.exportCanvas.width === this.width &&
-			this.exportCanvas.height === this.height
-		) {
-			return;
-		}
-		this.exportCanvas = new OffscreenCanvas(this.width, this.height);
-		const context = this.exportCanvas.getContext('webgpu');
-		if (!context) throw new Error('Could not acquire a WebGPU context for the export canvas.');
-		this.exportContext = context;
-		this.exportContext.configure({
-			device: this.device,
-			format: this.format,
-			alphaMode: 'premultiplied'
-		});
+		return this.captureCanvasFrame(timestamp, duration);
 	}
 
 	/** Emits a GPU-cleared black frame for gaps in the timeline (empty stack). */
@@ -2322,9 +2273,6 @@ export class PreviewRenderer {
 		this.beautyLandmarkBuffers.length = 0;
 		this.presentBindGroup = null;
 		this.lastPresentView = null;
-		(this.exportContext as GPUCanvasContext & { unconfigure?: () => void })?.unconfigure?.();
-		this.exportCanvas = null;
-		this.exportContext = null;
 		this.scopeSab = null;
 		this.scopeHistogramBuf?.destroy();
 		this.scopeHistogramBuf = null;
@@ -2402,8 +2350,8 @@ export class PreviewRenderer {
 		this.skinScratch1View = null;
 	}
 
-	private captureCanvasFrame(canvas: OffscreenCanvas, timestamp: number, duration: number): VideoFrame {
-		return new VideoFrame(canvas, {
+	private captureCanvasFrame(timestamp: number, duration: number): VideoFrame {
+		return new VideoFrame(this.canvas, {
 			timestamp: Math.round(timestamp * 1_000_000),
 			duration: Math.max(1, Math.round(duration * 1_000_000))
 		});

@@ -58,6 +58,30 @@ interface PendingFrame {
 	timestamp: number;
 }
 
+/** How long a decoder may stay silent (no output, no error) before it counts
+ *  as wedged — hardware decoders occasionally accept a full queue and then
+ *  never output or error, which would otherwise hang the export forever. */
+const WEDGE_TIMEOUT_MS = 5000;
+
+/** Thrown when a decoder stalls without erroring — a swallowed decoder/driver
+ *  wedge, not a config problem. The video samples() loop falls back to a
+ *  software decoder on this error. */
+export class VideoDecoderWedgeError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'VideoDecoderWedgeError';
+	}
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+	return Promise.race([
+		promise,
+		new Promise<never>((_resolve, reject) =>
+			setTimeout(() => reject(new VideoDecoderWedgeError(`${what} stalled for ${ms}ms`)), ms)
+		)
+	]);
+}
+
 export class WebCodecsVideoDecoder implements SequentialVideoSource {
 	private readonly track: InputVideoTrack;
 	private readonly maxQueueDepth: number;
@@ -73,6 +97,34 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 		_startTimestamp?: number,
 		_endTimestamp?: number
 	): AsyncGenerator<VideoSampleLike, void, unknown> {
+		const decoderConfig = await this.buildDecoderConfig();
+		const attempts: VideoDecoderConfig[] = [decoderConfig];
+		if (decoderConfig.hardwareAcceleration === 'prefer-hardware') {
+			attempts.push({ ...decoderConfig, hardwareAcceleration: 'prefer-software' });
+		}
+		let lastError: unknown = null;
+		for (const attempt of attempts) {
+			try {
+				yield* this.runSamples(attempt, _startTimestamp, _endTimestamp);
+				return;
+			} catch (error) {
+				lastError = error;
+				// Only a decoder stall (no output, no error) falls back to software;
+				// config/format errors are real and propagate immediately.
+				if (!(error instanceof VideoDecoderWedgeError)) throw error;
+				console.log(
+					'[export-debug] WebCodecs video decode wedged; retrying without hardware decode (' +
+						attempt.codec +
+						')'
+				);
+			}
+		}
+		throw lastError as Error;
+	}
+
+	/** Builds the decoder config from the track, normalizing H.264 level suffixes
+	 *  so VideoDecoder.isConfigSupported() accepts them. */
+	private async buildDecoderConfig(): Promise<VideoDecoderConfig> {
 		const trackConfig = await this.track.getDecoderConfig();
 		if (!trackConfig) throw new Error('No decoder config available for video track.');
 		const decoderConfig = {
@@ -87,18 +139,25 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 		if (this.hardwareAcceleration !== 'no-preference') {
 			decoderConfig.hardwareAcceleration = this.hardwareAcceleration;
 		}
-
 		if (typeof VideoDecoder === 'undefined') {
 			throw new Error('WebCodecs VideoDecoder is not supported in this environment.');
 		}
-		let support = await VideoDecoder.isConfigSupported(decoderConfig);
-		if (!support.supported && decoderConfig.hardwareAcceleration) {
-			// Retry without hardware acceleration preference
-			delete decoderConfig.hardwareAcceleration;
-			support = await VideoDecoder.isConfigSupported(decoderConfig);
+		return decoderConfig;
+	}
+
+	private async *runSamples(
+		decoderConfig: VideoDecoderConfig,
+		_startTimestamp?: number,
+		_endTimestamp?: number
+	): AsyncGenerator<VideoSampleLike, void, unknown> {
+		let config = decoderConfig;
+		let support = await VideoDecoder.isConfigSupported(config);
+		if (!support.supported && config.hardwareAcceleration === 'prefer-hardware') {
+			config = { ...config, hardwareAcceleration: 'prefer-software' };
+			support = await VideoDecoder.isConfigSupported(config);
 		}
 		if (!support.supported) {
-			throw new Error(`WebCodecs VideoDecoder does not support codec "${decoderConfig.codec}".`);
+			throw new Error(`WebCodecs VideoDecoder does not support codec "${config.codec}".`);
 		}
 
 		const pendingFrames: PendingFrame[] = [];
@@ -117,12 +176,16 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 			}
 		});
 
-		decoder.configure(decoderConfig);
+		decoder.configure(config);
 
 		const sink = new EncodedPacketSink(this.track);
 		const startPacket =
 			_startTimestamp !== undefined
-				? await sink.getKeyPacket(_startTimestamp, { skipLiveWait: true })
+				? await withTimeout(
+						sink.getKeyPacket(_startTimestamp, { skipLiveWait: true }),
+						WEDGE_TIMEOUT_MS,
+						'getKeyPacket'
+					)
 				: null;
 		const packets = sink.packets(startPacket ?? undefined, undefined, { skipLiveWait: true });
 
@@ -162,7 +225,8 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 				});
 
 			while (true) {
-				await feedDecoder();
+				// A stalled packet feed (demux hang) is a wedge too.
+				await withTimeout(feedDecoder(), WEDGE_TIMEOUT_MS, 'packet feed');
 				if (decoderError) throw decoderError;
 
 				if (pendingFrames.length === 0 && packetsExhausted && !flushed) {
@@ -173,9 +237,20 @@ export class WebCodecsVideoDecoder implements SequentialVideoSource {
 
 				if (pendingFrames.length === 0) {
 					if (flushed) break;
-					await waitForFrame();
+					// Race the frame wait against a watchdog: a hardware decoder can
+					// accept a full queue and then never output or error, which would
+					// otherwise hang the reader forever.
+					await Promise.race([
+						waitForFrame(),
+						new Promise<void>((resolve) => setTimeout(resolve, WEDGE_TIMEOUT_MS))
+					]);
 					if (decoderError) throw decoderError;
-					if (pendingFrames.length === 0) break;
+					if (pendingFrames.length === 0) {
+						if (packetsExhausted || flushed) break;
+						throw new VideoDecoderWedgeError(
+							'VideoDecoder produced no output within ' + WEDGE_TIMEOUT_MS + 'ms'
+						);
+					}
 				}
 
 				const entry = pendingFrames.shift()!;

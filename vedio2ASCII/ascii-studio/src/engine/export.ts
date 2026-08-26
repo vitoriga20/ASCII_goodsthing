@@ -1163,14 +1163,14 @@ async function encodeVideoRange(
 										() =>
 											reject(
 												new Error(
-													'[export-debug] frameAt TIMEOUT after 10s (source=' +
+													'[export-debug] frameAt TIMEOUT after 20s (source=' +
 														layer.clip.sourceId +
 														', ts=' +
 														sourceTimestamp.adapterTimestampS.toFixed(6) +
 														')'
 												)
 											),
-										10000
+										20000
 									)
 								)
 							])

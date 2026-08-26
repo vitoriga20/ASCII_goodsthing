@@ -1041,6 +1041,10 @@ async function encodeVideoRange(
 		fps: plan.frameRate,
 		timelineSeconds: plan.exportDuration
 	});
+	// TEMP DEBUG: coarse content fingerprint of the first exported frames, to
+	// prove or rule out duplicate/alternating canvas captures.
+	let frameHashCount = 0;
+	let frameHashPrev: number | null = null;
 
 	const frameDuration = 1 / plan.frameRate;
 	let lastReport = 0;
@@ -1247,6 +1251,26 @@ async function encodeVideoRange(
 					layers.length > 0
 						? await renderer.renderLayeredForExport(layers, outputTimestamp, duration, timelineTime)
 						: await renderer.renderBlackForExport(outputTimestamp, duration);
+				if (frameHashCount < 30) {
+					frameHashCount += 1;
+					try {
+						const bytes = new ArrayBuffer(exportFrame.allocationSize({ format: 'RGBA' }));
+						await exportFrame.copyTo(bytes, { format: 'RGBA' });
+						const view = new Uint8Array(bytes);
+						let hash = 0;
+						const step = Math.max(1, Math.floor(view.length / 8192));
+						for (let i = 0; i < view.length; i += step) hash = ((hash * 31) | 0) + view[i];
+						hash = hash >>> 0;
+						const dup = frameHashPrev !== null && hash === frameHashPrev ? ' DUP<-' : '';
+						console.log(
+							'[export-debug] frame ' + frameIndex + ' hash=' + hash.toString(16) + dup,
+							{ w: exportFrame.displayWidth, h: exportFrame.displayHeight }
+						);
+						frameHashPrev = hash;
+					} catch (error) {
+						console.log('[export-debug] frame hash failed:', error instanceof Error ? error.message : error);
+					}
+				}
 				if (frameIndex === startFrame || frameIndex % 60 === 0) {
 					console.log(
 						'[export-debug] frame ' + frameIndex + ' rendered, layers=' + layers.length,
